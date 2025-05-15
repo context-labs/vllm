@@ -1037,7 +1037,11 @@ class LLMEngine:
             # so invalidate is_first_step_output.
             is_first_step_output = None
         else:
-            outputs_by_sequence_group = outputs
+            outputs_by_sequence_group = create_output_by_sequence_group(
+                    outputs, len(seq_group_metadata_list))
+
+        #if self.model_config.return_hidden_states:
+        #    self._copy_hidden_states_to_outputs(outputs, outputs_by_sequence_group)
 
         # Determine the requests we need to operate on
         if request_id:
@@ -1071,11 +1075,7 @@ class LLMEngine:
                 finished_before.append(i)
                 continue
 
-            output: List[SequenceGroupOutput]
-            if has_multiple_outputs:
-                output = outputs_by_sequence_group[i]
-            else:
-                output = [outputs_by_sequence_group[0][i]]
+            output: List[SequenceGroupOutput] = outputs_by_sequence_group[i]
 
             if not is_async:
                 if self.scheduler_config.is_multi_step:

@@ -296,6 +296,10 @@ class ModelConfig:
     - 1k -> 1000\n
     - 1K -> 1024\n
     - 25.6k -> 25,600"""
+    return_hidden_states: Optional[bool] = None
+    """Whether to return hidden states. If `None`, we first check the
+    `return_hidden_states` attribute in the model config file. If that is
+    `None`, we assume the model does not return hidden states."""
     spec_target_max_model_len: Optional[int] = None
     """Specify the the maximum length for spec decoding draft models."""
     quantization: Optional[QuantizationMethods] = None

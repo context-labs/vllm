@@ -473,16 +473,16 @@ class Sequence:
         block_size: int,
         eos_token_id: Optional[int] = None,
         lora_request: Optional[LoRARequest] = None,
-        hidden_states: Optional[torch.Tensor] = None,
         prompt_adapter_request: Optional[PromptAdapterRequest] = None,
+        hidden_states: Optional[torch.Tensor] = None,
     ) -> None:
         self.seq_id = seq_id
         self.inputs = inputs
         self.block_size = block_size
         self.eos_token_id = eos_token_id
         self.lora_request = lora_request
-        self.hidden_states = hidden_states
         self.prompt_adapter_request = prompt_adapter_request
+        self.hidden_states = hidden_states
 
         self.data = SequenceData.from_seqs(
             self.prompt_token_ids,

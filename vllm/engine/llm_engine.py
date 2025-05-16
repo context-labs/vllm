@@ -1129,7 +1129,6 @@ class LLMEngine:
             request_output = RequestOutputFactory.create(
                 seq_group,
                 self.seq_id_to_seq_group,
-                steps=outputs, # These are the sequence groups arranged by step: [step][sequence group]
                 use_cache=self.use_cached_outputs)
             if request_output:
                 ctx.request_outputs.append(request_output)
@@ -1174,7 +1173,6 @@ class LLMEngine:
             request_output = RequestOutputFactory.create(
                 seq_group,
                 self.seq_id_to_seq_group,
-                steps=outputs, # These are the sequence groups arranged by step [step][sequence group]
                 use_cache=self.use_cached_outputs)
             if request_output:
                 ctx.request_outputs.append(request_output)
@@ -1196,7 +1194,6 @@ class LLMEngine:
             request_output = RequestOutputFactory.create(
                 seq_group,
                 self.seq_id_to_seq_group,
-                steps=outputs, # These are the sequence groups arranged by step [step][sequence group]
                 use_cache=self.use_cached_outputs,
             )
             if request_output:

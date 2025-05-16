@@ -174,7 +174,6 @@ class RequestOutput:
     @classmethod
     def from_seq_group(
         cls, seq_group: SequenceGroup, use_cache: bool,
-        steps: List[SamplerOutput],
         seq_id_to_seq_group: dict[str, SequenceGroupBase]
     ) -> Optional["RequestOutput"]:
         finished = seq_group.is_finished()
@@ -195,7 +194,6 @@ class RequestOutput:
                         del seq_id_to_seq_group[sub_request_id]
 
             return cls.from_seq_group(assembled_seq_group, use_cache,
-                                      steps,
                                       seq_id_to_seq_group)
 
         sampling_params = seq_group.sampling_params
@@ -243,7 +241,7 @@ class RequestOutput:
             output_logprobs = seq.output_logprobs if include_logprobs else None
 
             hidden_states = seq.hidden_states
-            print(f"Hidden states found on sequence {i}; {hidden_states.shape}: {hidden_states is not None}")
+            print(f"Hidden states found on sequence {i}; {hidden_states.shape if hidden_states is not None else None}: {hidden_states is not None}")
 
             if delta:
                 # Slice logprobs delta if applicable
@@ -413,13 +411,11 @@ class RequestOutputFactory:
     @staticmethod
     def create(seq_group: SequenceGroup,
                seq_id_to_seq_group: dict[str, SequenceGroupBase],
-               steps: List[SamplerOutput],
                use_cache: bool = False):
         if seq_group.pooled_data is not None:
             return PoolingRequestOutput.from_seq_group(seq_group)
         else:
             return RequestOutput.from_seq_group(seq_group, use_cache,
-                                                steps,
                                                 seq_id_to_seq_group)
 
 

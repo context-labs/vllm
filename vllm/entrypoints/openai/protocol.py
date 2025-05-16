@@ -1243,7 +1243,7 @@ class CompletionResponseStreamChoice(OpenAIBaseModel):
     text: str
     logprobs: Optional[CompletionLogProbs] = None
     finish_reason: Optional[str] = None
-    hidden_states: Optional[List[List[float]]] = None
+    hidden_states: Optional[list[list[float]]] = None
     stop_reason: Optional[Union[int, str]] = Field(
         default=None,
         description=(
@@ -1412,7 +1412,7 @@ class ChatCompletionResponseChoice(OpenAIBaseModel):
     index: int
     message: ChatMessage
     logprobs: Optional[ChatCompletionLogProbs] = None
-    hidden_states : Optional[List[List[float]]] = None
+    hidden_states : Optional[list[list[float]]] = None
     # per OpenAI spec this is the default
     finish_reason: Optional[str] = "stop"
     # not part of the OpenAI spec but included in vLLM for legacy reasons
@@ -1436,7 +1436,7 @@ class DeltaMessage(OpenAIBaseModel):
     content: Optional[str] = None
     reasoning_content: Optional[str] = None
     tool_calls: list[DeltaToolCall] = Field(default_factory=list)
-    hidden_states : Optional[List[List[float]]] = None
+    hidden_states : Optional[list[list[float]]] = None
 
 
 class ChatCompletionResponseStreamChoice(OpenAIBaseModel):

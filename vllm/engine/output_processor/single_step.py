@@ -54,6 +54,22 @@ def single_step_process_prompt_logprob(
         seq_group.prompt_logprobs.extend(prompt_logprobs)
 
 
+def single_step_process_hidden_states(
+        sg_output_proc: SequenceGroupOutputProcessor, seq_group: SequenceGroup,
+        output: CompletionSequenceGroupOutput) -> None:
+    hidden_states = output.hidden_states
+    if hidden_states is not None:
+        print("Hidden states found on output CompletionSequenceGroupOutput.")
+        for seq_idx, seq in enumerate(seq_group.seqs):
+            print("Processing sequence {seq_idx}.")
+            if not seq.is_finished():
+                print("Sequence is not finished, skipping hidden states.")
+                continue
+            if seq.is_finished() and seq.hidden_states is None:
+                print("Sequence is finished and hidden states is None, setting hidden states.")
+                seq.hidden_states = hidden_states[seq_idx,:].cpu()
+
+
 class SingleStepOutputProcessor(SequenceGroupOutputProcessor):
     """SequenceGroupOutputProcessor which handles "output processing" logic,
     which happens after the model returns generated token ids and before
@@ -110,6 +126,20 @@ class SingleStepOutputProcessor(SequenceGroupOutputProcessor):
         output = outputs[0]
         assert isinstance(output, CompletionSequenceGroupOutput)
         single_step_process_prompt_logprob(self, seq_group, output)
+
+    def process_hidden_states(self, seq_group: SequenceGroup, outputs: List[SequenceGroupOutput]) -> None:
+        """Process hidden states associated with one step of a single-step-
+        scheduled computation.
+        
+        Args:
+          seq_group: the output is associated with this {class}`SequenceGroup`
+          outputs: the {class}`SequenceGroupOutput` for a single scheduler step
+        """
+        assert len(outputs) == 1, "Single step should only have 1 output."
+        output = outputs[0]
+        assert isinstance(output, CompletionSequenceGroupOutput)
+        print("In single step, process_hidden_states")
+        single_step_process_hidden_states(self, seq_group, output)
 
     def _process_sequence_group_outputs(self, seq_group: SequenceGroup,
                                         outputs: SequenceGroupOutput,

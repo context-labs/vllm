@@ -10,7 +10,8 @@ from vllm.sequence import CompletionSequenceGroupOutput, SequenceGroupOutput
 
 def create_output_by_sequence_group(
         outputs: GenericSequence[SamplerOutput],
-        num_seq_groups: int) -> List[List[SequenceGroupOutput]]:
+        num_seq_groups: int,
+        include_hidden_states: bool) -> List[List[SequenceGroupOutput]]:
     """Helper method which transforms a 2d list organized by
     [step][sequence group] into [sequence group][step].
     """
@@ -19,8 +20,15 @@ def create_output_by_sequence_group(
     ]
     for step in outputs:
         sequence_group_output: CompletionSequenceGroupOutput
+        start_idx = 0
         for i, sequence_group_output in enumerate(step):
             output_by_sequence_group[i].append(sequence_group_output)
+            if include_hidden_states and sequence_group_output.hidden_states is not None:
+                num_seqs = len(sequence_group_output.samples)
+                end_idx = start_idx + num_seqs
+                sequence_group_output.hidden_states = (
+                    step.hidden_states[start_idx:end_idx, :])
+                start_idx = end_idx
 
     # Cast to the more generic type that CompletionSequenceGroupOutput
     # inherits from.

@@ -1018,7 +1018,7 @@ class LLMEngine:
             # [sequence group][step].
             if self.scheduler_config.is_multi_step:
                 outputs_by_sequence_group = create_output_by_sequence_group(
-                    outputs, len(seq_group_metadata_list))
+                    outputs, len(seq_group_metadata_list), include_hidden_states = self.model_config.return_hidden_states)
             elif self.speculative_config:
                 # Decodes are multi-steps while prefills are not, outputting at
                 # most 1 token. Separate them so that we can trigger chunk
@@ -1030,7 +1030,8 @@ class LLMEngine:
                     num_prefills:]
                 outputs_by_sequence_group = create_output_by_sequence_group(
                     decodes,
-                    num_seq_groups=len(seq_group_metadata_list) - num_prefills)
+                    num_seq_groups=len(seq_group_metadata_list) - num_prefills,
+                    include_hidden_states=self.model_config.return_hidden_states)
                 outputs_by_sequence_group = [p.outputs for p in prefills
                                              ] + outputs_by_sequence_group
             # We have outputs for multiple steps submitted in a single burst,
@@ -1038,10 +1039,7 @@ class LLMEngine:
             is_first_step_output = None
         else:
             outputs_by_sequence_group = create_output_by_sequence_group(
-                    outputs, len(seq_group_metadata_list))
-
-        #if self.model_config.return_hidden_states:
-        #    self._copy_hidden_states_to_outputs(outputs, outputs_by_sequence_group)
+                    outputs, len(seq_group_metadata_list), include_hidden_states = self.model_config.return_hidden_states)
 
         # Determine the requests we need to operate on
         if request_id:
@@ -1062,13 +1060,15 @@ class LLMEngine:
 
         finished_before: List[int] = []
         finished_now: List[int] = []
+
+        # For every sequence group to process
         for i in indices:
             if i in skip:
                 continue
 
+            # Get the metadata, scheduled sequence group, and sequence group
             seq_group_meta = seq_group_metadata_list[i]
             scheduled_seq_group = scheduler_outputs.scheduled_seq_groups[i]
-
             seq_group: SequenceGroup = scheduled_seq_group.seq_group
 
             if seq_group.is_finished():
@@ -1086,6 +1086,7 @@ class LLMEngine:
                     seq_group.update_num_computed_tokens(
                         seq_group_meta.token_chunk_size or 0)
 
+            # Update total elapsed time metrics for sampler outputs
             if outputs:
                 for o in outputs:
                     if (isinstance(o, SamplerOutput)
@@ -1107,6 +1108,9 @@ class LLMEngine:
                 self._process_sequence_group_outputs(seq_group, output)
             else:
                 self.output_processor.process_prompt_logprob(seq_group, output)
+                if self.model_config.return_hidden_states:
+                    print("About to call process_hidden_states on output_processor")
+                    self.output_processor.process_hidden_states(seq_group, output)
                 if seq_group_meta.do_sample:
                     self.output_processor.process_outputs(
                         seq_group, output, is_async)
@@ -1125,6 +1129,7 @@ class LLMEngine:
             request_output = RequestOutputFactory.create(
                 seq_group,
                 self.seq_id_to_seq_group,
+                steps=outputs, # These are the sequence groups arranged by step: [step][sequence group]
                 use_cache=self.use_cached_outputs)
             if request_output:
                 ctx.request_outputs.append(request_output)
@@ -1169,6 +1174,7 @@ class LLMEngine:
             request_output = RequestOutputFactory.create(
                 seq_group,
                 self.seq_id_to_seq_group,
+                steps=outputs, # These are the sequence groups arranged by step [step][sequence group]
                 use_cache=self.use_cached_outputs)
             if request_output:
                 ctx.request_outputs.append(request_output)
@@ -1190,6 +1196,7 @@ class LLMEngine:
             request_output = RequestOutputFactory.create(
                 seq_group,
                 self.seq_id_to_seq_group,
+                steps=outputs, # These are the sequence groups arranged by step [step][sequence group]
                 use_cache=self.use_cached_outputs,
             )
             if request_output:

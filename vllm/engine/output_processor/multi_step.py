@@ -7,7 +7,8 @@ from vllm.core.scheduler import Scheduler
 from vllm.engine.output_processor.interfaces import (
     SequenceGroupOutputProcessor)
 from vllm.engine.output_processor.single_step import (
-    single_step_process_prompt_logprob)
+    single_step_process_prompt_logprob,
+    single_step_process_hidden_states)
 from vllm.engine.output_processor.stop_checker import StopChecker
 from vllm.logger import init_logger
 from vllm.sampling_params import SamplingParams
@@ -63,6 +64,20 @@ class MultiStepOutputProcessor(SequenceGroupOutputProcessor):
             # Concatenate single-step prompt logprob processing results.
             assert isinstance(output, CompletionSequenceGroupOutput)
             single_step_process_prompt_logprob(self, seq_group, output)
+
+    def process_hidden_states(self, seq_group: SequenceGroup, outputs: List[SequenceGroupOutput]) -> None:
+        """Process hidden states associated with each step of a multi-step-
+        scheduled computation.
+
+        Args:
+          seq_group: the outputs are associated with this {class}`SequenceGroup`
+          outputs: the {class}`SequenceGroupOutput`s for all scheduler steps
+        """
+        for output in outputs:
+            # Concatenate single-step hidden states processing results.
+            assert isinstance(output, CompletionSequenceGroupOutput)
+            print("In multistep, process_hidden_states")
+            single_step_process_hidden_states(self, seq_group, output)
 
     @staticmethod
     @functools.lru_cache

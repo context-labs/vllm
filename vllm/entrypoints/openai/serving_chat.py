@@ -824,6 +824,7 @@ class OpenAIServingChat(OpenAIServing):
                             index=i,
                             delta=delta_message,
                             logprobs=logprobs,
+                            hidden_states=output.hidden_states,
                             finish_reason=output.finish_reason
                             if not auto_tools_called else "tool_calls",
                             stop_reason=output.stop_reason)
@@ -1040,10 +1041,14 @@ class OpenAIServingChat(OpenAIServing):
                                       reasoning_content=reasoning_content,
                                       content=content)
 
+            hidden_states = output.hidden_states
+            print(f"Hidden states found on output CompletionSequenceGroupOutput." if hidden_states is not None else "No hidden states found on output CompletionSequenceGroupOutput.")
+
             choice_data = ChatCompletionResponseChoice(
                 index=output.index,
                 message=message,
                 logprobs=logprobs,
+                hidden_states=hidden_states,
                 finish_reason="tool_calls" if auto_tools_called else
                 output.finish_reason if output.finish_reason else "stop",
                 stop_reason=output.stop_reason)

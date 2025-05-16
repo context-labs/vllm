@@ -28,6 +28,7 @@ class CompletionOutput:
             output text.
         logprobs: The log probabilities of the top probability words at each
             position if the logprobs are requested.
+        hidden_states: Hidden State of the last token in the sequence.
         finish_reason: The reason why the sequence is finished.
         stop_reason: The stop string or token id that caused the completion
             to stop, None if the completion finished for some other reason
@@ -40,6 +41,7 @@ class CompletionOutput:
     token_ids: GenericSequence[int]
     cumulative_logprob: Optional[float]
     logprobs: Optional[SampleLogprobs]
+    hidden_states: Optional[torch.Tensor] = None
     finish_reason: Optional[str] = None
     stop_reason: Union[int, str, None] = None
     lora_request: Optional[LoRARequest] = None
@@ -53,6 +55,7 @@ class CompletionOutput:
                 f"token_ids={self.token_ids}, "
                 f"cumulative_logprob={self.cumulative_logprob}, "
                 f"logprobs={self.logprobs}, "
+                f"hidden_states=Tensor({self.hidden_states.shape})," if self.hidden_states is not None else "None,",
                 f"finish_reason={self.finish_reason}, "
                 f"stop_reason={self.stop_reason})")
 
@@ -171,6 +174,7 @@ class RequestOutput:
     @classmethod
     def from_seq_group(
         cls, seq_group: SequenceGroup, use_cache: bool,
+        steps: List[SamplerOutput],
         seq_id_to_seq_group: dict[str, SequenceGroupBase]
     ) -> Optional["RequestOutput"]:
         finished = seq_group.is_finished()
@@ -191,6 +195,7 @@ class RequestOutput:
                         del seq_id_to_seq_group[sub_request_id]
 
             return cls.from_seq_group(assembled_seq_group, use_cache,
+                                      steps,
                                       seq_id_to_seq_group)
 
         sampling_params = seq_group.sampling_params
@@ -237,6 +242,9 @@ class RequestOutput:
 
             output_logprobs = seq.output_logprobs if include_logprobs else None
 
+            hidden_states = seq.hidden_states
+            print(f"Hidden states found on sequence {i}; {hidden_states.shape}: {hidden_states is not None}")
+
             if delta:
                 # Slice logprobs delta if applicable
                 if output_logprobs:
@@ -261,6 +269,7 @@ class RequestOutput:
                                          token_ids=[],
                                          cumulative_logprob=None,
                                          logprobs=None,
+                                         hidden_states=hidden_states,
                                          finish_reason=None,
                                          stop_reason=None))
                 output = cached_outputs[i]
@@ -278,6 +287,7 @@ class RequestOutput:
                 output.cumulative_logprob = seq.get_cumulative_logprob() \
                     if include_logprobs else None
                 output.logprobs = output_logprobs
+                output.hidden_states = hidden_states
                 output.finish_reason = SequenceStatus.get_finished_reason(
                     seq.status)
                 output.stop_reason = seq.stop_reason
@@ -288,6 +298,7 @@ class RequestOutput:
                     if isinstance(output_token_ids, int) else output_token_ids,
                     seq.get_cumulative_logprob() if include_logprobs else None,
                     output_logprobs,
+                    hidden_states,
                     SequenceStatus.get_finished_reason(seq.status),
                     seq.stop_reason)
 
@@ -402,11 +413,13 @@ class RequestOutputFactory:
     @staticmethod
     def create(seq_group: SequenceGroup,
                seq_id_to_seq_group: dict[str, SequenceGroupBase],
+               steps: List[SamplerOutput],
                use_cache: bool = False):
         if seq_group.pooled_data is not None:
             return PoolingRequestOutput.from_seq_group(seq_group)
         else:
             return RequestOutput.from_seq_group(seq_group, use_cache,
+                                                steps,
                                                 seq_id_to_seq_group)
 
 

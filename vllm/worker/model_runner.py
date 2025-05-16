@@ -1938,6 +1938,7 @@ class ModelRunner(GPUModelRunnerBase[ModelInputForGPUWithSamplingMetadata]):
                     assert len(sequence_group_output.samples) == 1
                     sequence_group_output.samples[0].output_embed = token_embed
 
+        print("In model_runner, self.return_hidden_states", self.return_hidden_states, "hidden_or_intermediate_states:", hidden_or_intermediate_states is not None)
         if self.return_hidden_states:
             # we only need to pass hidden states of most recent token
             assert model_input.sampling_metadata is not None
@@ -1951,6 +1952,7 @@ class ModelRunner(GPUModelRunnerBase[ModelInputForGPUWithSamplingMetadata]):
             else:
                 hidden_states = hidden_or_intermediate_states
 
+            print("In model_runner, hidden_states:", hidden_states is not None)
             output.hidden_states = hidden_states
 
         return [output]

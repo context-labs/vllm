@@ -18,26 +18,23 @@ def test_return_hidden_states(model: str):
     engine = LLMEngine.from_engine_args(engine_args)
     tokenizer = engine.tokenizer.tokenizer
     sampling_params = SamplingParams()
-    prompt1 = (
-        "You are a helpful assistant. How do I build a car from cardboard and "
-        "paper clips? Is there an easy to follow video tutorial available "
-        "online for free?")
-    prompt2a = (
-        " Please recommend to me some resources where I can learn not only to "
-        "handle technical difficulties of building a car, but also "
-        "decoration.")
-    prompt_2a_tokens = tokenizer(prompt2a)['input_ids']
-    engine.add_request("0", prompt1 + prompt2a, sampling_params)
-    # step1_out is prefill / prompt
-    step1_out = engine.step()
-    assert isinstance(step1_out, list)
-    (request1_out,) = step1_out
-    assert isinstance(request1_out, RequestOutput)
-    # Ensure hidden states are returned from step 2.
-    step2_out = engine.step()
-    (request2_out,) = step2_out
-    assert isinstance(request2_out, RequestOutput)
-    assert (request2_out.outputs[0].hidden_states is not None)
+    prompt = (
+        "You are a helpful assistant. Please tell me the capital of France in a few words.")
+    prompt_tokens = tokenizer(prompt)['input_ids']
+    engine.add_request("0", prompt, sampling_params)
+
+    finished = False
+    i = 0
+    while not finished and i < 100:
+        (step_out,) = engine.step()
+        assert isinstance(step_out, RequestOutput)
+        if step_out.finished:
+            finished = True
+            assert step_out.outputs[0].hidden_states is not None
+        else:
+            assert step_out.outputs[0].hidden_states is None
+        i += 1
+
     
     """
     request1_out, request2_out = step2_out

@@ -18,12 +18,15 @@ def create_output_by_sequence_group(
     output_by_sequence_group: List[List[CompletionSequenceGroupOutput]] = [
         [] for _ in range(num_seq_groups)
     ]
+    print("In create_output_by_sequence_group")
     for step in outputs:
         sequence_group_output: CompletionSequenceGroupOutput
         start_idx = 0
         for i, sequence_group_output in enumerate(step):
             output_by_sequence_group[i].append(sequence_group_output)
-            if include_hidden_states and sequence_group_output.hidden_states is not None:
+            print("include_hidden_states:", include_hidden_states, "step.hidden_states is not None:", step.hidden_states is not None)
+            if include_hidden_states and step.hidden_states is not None:
+                print("In create_output_by_sequence_group, found hidden states.")
                 num_seqs = len(sequence_group_output.samples)
                 end_idx = start_idx + num_seqs
                 sequence_group_output.hidden_states = (

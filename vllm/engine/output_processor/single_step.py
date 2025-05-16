@@ -61,7 +61,7 @@ def single_step_process_hidden_states(
     if hidden_states is not None:
         print("Hidden states found on output CompletionSequenceGroupOutput.")
         for seq_idx, seq in enumerate(seq_group.seqs):
-            print("Processing sequence {seq_idx}.")
+            print(f"Processing sequence {seq_idx}.")
             if not seq.is_finished():
                 print("Sequence is not finished, skipping hidden states.")
                 continue

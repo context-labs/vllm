@@ -1108,12 +1108,12 @@ class LLMEngine:
                 self._process_sequence_group_outputs(seq_group, output)
             else:
                 self.output_processor.process_prompt_logprob(seq_group, output)
-                if self.model_config.return_hidden_states:
-                    print("About to call process_hidden_states on output_processor")
-                    self.output_processor.process_hidden_states(seq_group, output)
                 if seq_group_meta.do_sample:
                     self.output_processor.process_outputs(
                         seq_group, output, is_async)
+                if self.model_config.return_hidden_states:
+                    print("About to call process_hidden_states on output_processor")
+                    self.output_processor.process_hidden_states(seq_group, output)                        
 
             if seq_group.is_finished():
                 finished_now.append(i)

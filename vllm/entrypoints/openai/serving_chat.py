@@ -759,6 +759,10 @@ class OpenAIServingChat(OpenAIServing):
                     if delta_message is None:
                         continue
 
+                    # Hidden states will be omitted from the response if None
+                    hidden_states = [output.hidden_states.tolist()] if output.hidden_states is not None else None
+                    delta_message.hidden_states = hidden_states
+
                     if output.finish_reason is None:
                         # Send token-by-token response for each request.n
                         choice_data = ChatCompletionResponseStreamChoice(
@@ -819,14 +823,11 @@ class OpenAIServingChat(OpenAIServing):
                                               model_dump(exclude_none=True))
                             ])
 
-                        hidden_states = [output.hidden_states.tolist()] if output.hidden_states is not None else None
-
                         # Send the finish response for each request.n only once
                         choice_data = ChatCompletionResponseStreamChoice(
                             index=i,
                             delta=delta_message,
                             logprobs=logprobs,
-                            hidden_states=hidden_states,
                             finish_reason=output.finish_reason
                             if not auto_tools_called else "tool_calls",
                             stop_reason=output.stop_reason)

@@ -91,8 +91,7 @@ def default_server_args(zephyr_lora_files, zephyr_lora_added_tokens_files,
         "128",
     ]
 
-# TODO: temporary skip non-hidden-states
-@pytest.fixture(scope="module", params=["","--return-hidden-states"])  
+@pytest.fixture(scope="module", params=[False,True])  
 def return_hidden_states_param(request):
     return request.param
 

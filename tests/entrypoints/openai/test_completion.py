@@ -92,7 +92,7 @@ def default_server_args(zephyr_lora_files, zephyr_lora_added_tokens_files,
     ]
 
 # TODO: temporary skip non-hidden-states
-@pytest.fixture(scope="module", params=["", "--return-hidden-states"])  
+@pytest.fixture(scope="module", params=["","--return-hidden-states"])  
 def return_hidden_states_param(request):
     return request.param
 
@@ -403,7 +403,7 @@ async def test_parallel_streaming(client: openai.AsyncOpenAI, model_name: str):
     [MODEL_NAME, "zephyr-lora", "zephyr-pa"],
 )
 async def test_completion_stream_options(client: openai.AsyncOpenAI,
-                                         model_name: str):
+                                         model_name: str, return_hidden_states_param: str):
     prompt = "What is the capital of France?"
 
     # Test stream=True, stream_options=
@@ -522,8 +522,7 @@ async def test_completion_stream_options(client: openai.AsyncOpenAI,
             stream=False,
             stream_options={"continuous_usage_stats": None})
 
-    # Test stream=False, stream_options=
-    #    {"continuous_usage_stats": True}
+    # Test stream=True
     with pytest.raises(BadRequestError):
         await client.completions.create(
             model=model_name,
@@ -532,6 +531,21 @@ async def test_completion_stream_options(client: openai.AsyncOpenAI,
             temperature=0.0,
             stream=False,
             stream_options={"continuous_usage_stats": True})
+    
+    hidden_states = None
+    stream = await client.completions.create(model=model_name,
+                                            prompt=prompt,
+                                            max_tokens=5,
+                                            temperature=0.0,
+                                            stream=True)
+    async for chunk in stream:
+        hidden_states = hidden_states or (chunk.choices[0].hidden_states if hasattr(chunk.choices[0], "hidden_states") else None)
+    if return_hidden_states_param:
+        assert hidden_states is not None, "hidden_states not found in stream"
+        assert len(hidden_states) == 1, "hidden_states should have only one element"
+        assert len(hidden_states[0]) > 1, "hidden_states dimension should be greater than 1"
+    else:
+        assert hidden_states is None, "hidden_states found in stream"
 
 
 @pytest.mark.asyncio

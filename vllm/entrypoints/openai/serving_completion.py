@@ -335,6 +335,7 @@ class OpenAIServingCompletion(OpenAIServing):
 
                     previous_text_lens[i] += len(output.text)
                     previous_num_tokens[i] += len(output.token_ids)
+                    hidden_states = [output.hidden_states.tolist()] if output.hidden_states is not None else None
                     finish_reason = output.finish_reason
                     stop_reason = output.stop_reason
 
@@ -347,7 +348,7 @@ class OpenAIServingCompletion(OpenAIServing):
                                 index=i,
                                 text=delta_text,
                                 logprobs=logprobs,
-                                hidden_states=output.hidden_states,
+                                hidden_states=hidden_states,
                                 finish_reason=finish_reason,
                                 stop_reason=stop_reason,
                             )
@@ -455,7 +456,7 @@ class OpenAIServingCompletion(OpenAIServing):
                 else:
                     logprobs = None
 
-                hidden_states = output.hidden_states
+                hidden_states = [output.hidden_states.tolist()] if output.hidden_states is not None else None
                 print(f"Hidden states found on output CompletionSequenceGroupOutput." if hidden_states is not None else "No hidden states found on output CompletionSequenceGroupOutput.")
 
                 choice_data = CompletionResponseChoice(

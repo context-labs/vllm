@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 
+import httpx
 import asyncio
 import copy
 import functools
@@ -179,6 +180,7 @@ class RemoteOpenAIServer:
             base_url=self.url_for("v1"),
             api_key=self.DUMMY_API_KEY,
             max_retries=0,
+            http_client=httpx.Client(event_hooks={"response": [log_raw_response]})
             **kwargs,
         )
 
@@ -190,6 +192,11 @@ class RemoteOpenAIServer:
                                   max_retries=0,
                                   **kwargs)
 
+
+# Create a custom HTTPX client with event hooks
+def log_raw_response(response: httpx.Response):
+    print("RAW RESPONSE BODY:")
+    print(response.text)  # Raw string before Pydantic parses it
 
 def _test_completion(
     client: openai.OpenAI,

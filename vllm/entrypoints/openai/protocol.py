@@ -11,7 +11,7 @@ from typing import Annotated, Any, ClassVar, Literal, Optional, Union
 import torch
 from fastapi import HTTPException, UploadFile
 from pydantic import (BaseModel, ConfigDict, Field, TypeAdapter,
-                      ValidationInfo, field_validator, model_validator)
+                      ValidationInfo, field_validator, model_validator, model_serializer)
 from typing_extensions import TypeAlias
 
 from vllm import envs
@@ -35,6 +35,8 @@ class OpenAIBaseModel(BaseModel):
 
     # Cache class field names
     field_names: ClassVar[Optional[set[str]]] = None
+
+    exclude_if_none_fields : ClassVar[list[str]] = []
 
     @model_validator(mode="wrap")
     @classmethod
@@ -60,6 +62,10 @@ class OpenAIBaseModel(BaseModel):
                 data.keys() - field_names,
             )
         return result
+
+    @model_serializer
+    def _serialize(self):
+        return exclude_if_none(self, self.__class__.exclude_if_none_fields)        
 
 
 class ErrorResponse(OpenAIBaseModel):
@@ -1225,6 +1231,8 @@ class CompletionResponseChoice(OpenAIBaseModel):
             "including encountering the EOS token"),
     )
     prompt_logprobs: Optional[list[Optional[dict[int, Logprob]]]] = None
+    hidden_states: Optional[list[list[float]]] = None
+    exclude_if_none_fields = ["hidden_states"]
 
 
 class CompletionResponse(OpenAIBaseModel):
@@ -1251,6 +1259,7 @@ class CompletionResponseStreamChoice(OpenAIBaseModel):
             "to stop, None if the completion finished for some other reason "
             "including encountering the EOS token"),
     )
+    exclude_if_none_fields = ["hidden_states"]
 
 
 class CompletionStreamResponse(OpenAIBaseModel):
@@ -1417,6 +1426,7 @@ class ChatCompletionResponseChoice(OpenAIBaseModel):
     finish_reason: Optional[str] = "stop"
     # not part of the OpenAI spec but included in vLLM for legacy reasons
     stop_reason: Optional[Union[int, str]] = None
+    exclude_if_none_fields = ["hidden_states"]
 
 
 class ChatCompletionResponse(OpenAIBaseModel):
@@ -1437,7 +1447,7 @@ class DeltaMessage(OpenAIBaseModel):
     reasoning_content: Optional[str] = None
     tool_calls: list[DeltaToolCall] = Field(default_factory=list)
     hidden_states : Optional[list[list[float]]] = None
-
+    exclude_if_none_fields = ["hidden_states"]
 
 class ChatCompletionResponseStreamChoice(OpenAIBaseModel):
     index: int
@@ -1878,3 +1888,7 @@ class TranscriptionResponseVerbose(OpenAIBaseModel):
 
     words: Optional[list[TranscriptionWord]] = None
     """Extracted words and their corresponding timestamps."""
+
+def exclude_if_none(obj, field_names: list[str]):
+    omit_if_none_fields = {k for k, v in obj.model_fields.items() if k in field_names}
+    return {k: v for k, v in obj if k not in omit_if_none_fields or v is not None}

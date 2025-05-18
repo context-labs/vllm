@@ -819,12 +819,14 @@ class OpenAIServingChat(OpenAIServing):
                                               model_dump(exclude_none=True))
                             ])
 
+                        hidden_states = [output.hidden_states.tolist()] if output.hidden_states is not None else None
+
                         # Send the finish response for each request.n only once
                         choice_data = ChatCompletionResponseStreamChoice(
                             index=i,
                             delta=delta_message,
                             logprobs=logprobs,
-                            hidden_states=output.hidden_states,
+                            hidden_states=hidden_states,
                             finish_reason=output.finish_reason
                             if not auto_tools_called else "tool_calls",
                             stop_reason=output.stop_reason)
@@ -1041,7 +1043,7 @@ class OpenAIServingChat(OpenAIServing):
                                       reasoning_content=reasoning_content,
                                       content=content)
 
-            hidden_states = output.hidden_states
+            hidden_states = [output.hidden_states.tolist()] if output.hidden_states is not None else None
             print(f"Hidden states found on output CompletionSequenceGroupOutput." if hidden_states is not None else "No hidden states found on output CompletionSequenceGroupOutput.")
 
             choice_data = ChatCompletionResponseChoice(

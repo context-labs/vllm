@@ -91,12 +91,21 @@ def default_server_args(zephyr_lora_files, zephyr_lora_added_tokens_files,
         "128",
     ]
 
+# TODO: temporary skip non-hidden-states
+@pytest.fixture(scope="module", params=["", "--return-hidden-states"])  
+def return_hidden_states_param(request):
+    return request.param
 
-@pytest.fixture(scope="module",
-                params=["", "--disable-frontend-multiprocessing"])
-def server(default_server_args, request):
-    if request.param:
-        default_server_args.append(request.param)
+@pytest.fixture(scope="module", params=["", "--disable-frontend-multiprocessing"])
+def disable_frontend_multiprocessing_param(request):
+    return request.param
+
+@pytest.fixture(scope="module")
+def server(default_server_args, disable_frontend_multiprocessing_param, return_hidden_states_param):
+    if disable_frontend_multiprocessing_param:
+        default_server_args.append(disable_frontend_multiprocessing_param)
+    if return_hidden_states_param:
+        default_server_args.append(return_hidden_states_param)
     with RemoteOpenAIServer(MODEL_NAME, default_server_args) as remote_server:
         yield remote_server
 
@@ -116,7 +125,7 @@ async def client(server):
      ("zephyr-pa2", PA_NUM_VIRTUAL_TOKENS)],
 )
 async def test_single_completion(client: openai.AsyncOpenAI, model_name: str,
-                                 num_virtual_tokens: int):
+                                 num_virtual_tokens: int, return_hidden_states_param):
     completion = await client.completions.create(model=model_name,
                                                  prompt="Hello, my name is",
                                                  max_tokens=5,
@@ -143,6 +152,16 @@ async def test_single_completion(client: openai.AsyncOpenAI, model_name: str,
     assert len(completion.choices[0].text) >= 1
     assert completion.choices[0].prompt_logprobs is None
 
+    if not return_hidden_states_param:
+        assert not hasattr(completion.choices[0], "hidden_states"), "hidden_states found in completion.choices[0]"
+        extra = completion.choices[0].__pydantic_extra__
+        assert "hidden_states" not in extra, "hidden_states found in extra of completion.choices[0]"
+    else:
+        extra = completion.choices[0].__pydantic_extra__
+        assert extra["hidden_states"] is not None, "hidden_states not found in extra of completion.choices[0]"
+        assert len(extra["hidden_states"]) == 1, "hidden_states should have only one element"
+        assert extra["hidden_states"][0] is not None, "hidden_states should not be empty"
+        assert len(extra["hidden_states"][0]) > 1, "hidden_states dimension should be greater than 1"
 
 @pytest.mark.asyncio
 async def test_added_lora_tokens(client: openai.AsyncOpenAI):

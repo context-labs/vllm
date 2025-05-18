@@ -32,18 +32,13 @@ def monkeypatch_module():
 def return_hidden_states_param(request):
     return request.param
 
-@pytest.fixture(scope="module", params = [False,True])
-def use_cuda_graph_param(request):
-    return request.param
-
 @pytest.fixture(scope="module", params = [False])
 def server(
         request,
         monkeypatch_module,
         zephyr_lora_files,  #noqa: F811
         zephyr_lora_added_tokens_files,
-        return_hidden_states_param : str,
-        use_cuda_graph_param : bool
+        return_hidden_states_param : str
 ):
     use_v1 = request.param
     monkeypatch_module.setenv('VLLM_USE_V1', '1' if use_v1 else '0')
@@ -54,6 +49,7 @@ def server(
         "bfloat16",
         "--max-model-len",
         "8192",
+        "--enforce-eager",
         # lora config below
         "--enable-lora",
         "--lora-modules",
@@ -66,9 +62,6 @@ def server(
         "--max-num-seqs",
         "128",
     ]
-
-    if not use_cuda_graph_param:
-        args.append("--enforce-eager")
 
     if return_hidden_states_param:
         args.append("--return-hidden-states")

@@ -1293,8 +1293,9 @@ class HiddenStates(msgspec.Struct, array_like=True,
     # last proposed token is accepted (i.e., in case of bonus tokens). For the
     # case of no bonus tokens, these are ignored.
     second_last_token_hidden_states: Optional[torch.Tensor] = None
-
     _seq_ids: list[int] = msgspec.field(default_factory=list)
+    # Scorer hidden states for decode including all steps: [batch, step, hidden_size]
+    hidden_states_for_all_steps: Optional[torch.Tensor] = None
 
     def __post_init__(self):
         if self.seq_group_metadata_list is not None:
@@ -1340,6 +1341,8 @@ class HiddenStates(msgspec.Struct, array_like=True,
             if self.second_last_token_hidden_states is not None:
                 self.second_last_token_hidden_states = self\
                     .second_last_token_hidden_states[index]
+            if self.hidden_states_for_all_steps is not None:
+                self.hidden_states_for_all_steps = self.hidden_states_for_all_steps[index]
             self._seq_ids = seq_ids
 
     def expand_with_bonus_tokens(

@@ -690,7 +690,8 @@ class SpecDecodeWorker(LoRANotSupportedWorkerBase):
             if self.previous_hidden_states is None and len(
                     seq_group_meta_with_hidden):
                 self.previous_hidden_states = HiddenStates(
-                    hidden_states, seq_group_meta_with_hidden)
+                    hidden_states, # [batch_size, hidden_size]
+                    seq_group_meta_with_hidden)
             elif self.previous_hidden_states and len(
                     seq_group_meta_with_hidden):
                 self.previous_hidden_states.update(hidden_states,
@@ -910,6 +911,9 @@ class SpecDecodeWorker(LoRANotSupportedWorkerBase):
                 sg for sg in seq_group_metadata_list if sg.do_sample
             ]
 
+            # Rearrange indices from [batch, step, hidden_size] to [step, batch, hidden_size]
+            hidden_states_for_all_steps = hidden_states
+
             # Contract hidden states based on accepted tokens
             hs_size = hidden_states.shape[-1]
             accepted_index = accepted_token_ids + 1  # Convert -1 to 0
@@ -927,8 +931,9 @@ class SpecDecodeWorker(LoRANotSupportedWorkerBase):
             hidden_states = hidden_states.gather(1, index).squeeze(1)  # b x d
             # Store hidden states from target model for subsequent decode step
             self.previous_hidden_states = HiddenStates(
-                hidden_states, terminal_metadata,
-                second_last_token_hidden_states)
+                hidden_states_for_all_steps = hidden_states_for_all_steps,
+                hidden_states =hidden_states, seq_group_metadata_list = terminal_metadata,
+                second_last_token_hidden_states = second_last_token_hidden_states)
         return accepted_token_ids, logprobs
 
     def _create_output_sampler_list(
@@ -1080,8 +1085,11 @@ class SpecDecodeWorker(LoRANotSupportedWorkerBase):
                         topk_logprobs=topk_logprobs_by_step[step_index]
                         [sequence_index][:num_logprobs],
                         step_index=step_index))
+            
+            assert len(self.previous_hidden_states.hidden_states_for_all_steps) == batch_size
+            sampler_output_hidden_states = self.previous_hidden_states.hidden_states_for_all_steps[:,step_index,:]
             sampler_output_list.append(
-                SamplerOutput(outputs=step_output_token_ids))
+                SamplerOutput(outputs=step_output_token_ids, hidden_states=sampler_output_hidden_states))
 
         # Populate the data structures needed to keep track of sequences with
         # bonus tokens.

@@ -50,14 +50,14 @@ class CompletionOutput:
         return self.finish_reason is not None
 
     def __repr__(self) -> str:
-        return (f"CompletionOutput(index={self.index}, "
-                f"text={self.text!r}, "
-                f"token_ids={self.token_ids}, "
-                f"cumulative_logprob={self.cumulative_logprob}, "
-                f"logprobs={self.logprobs}, "
-                f"hidden_states=Tensor({self.hidden_states.shape})," if self.hidden_states is not None else "None,",
-                f"finish_reason={self.finish_reason}, "
-                f"stop_reason={self.stop_reason})")
+        return f"CompletionOutput(index={self.index}, "
+        f"text={self.text!r}, "
+        f"token_ids={self.token_ids}, "
+        f"cumulative_logprob={self.cumulative_logprob}, "
+        f"logprobs={self.logprobs}, "
+        f"hidden_states={"Tensor({self.hidden_states.shape})," if self.hidden_states is not None else "None,"}"
+        f"finish_reason={self.finish_reason}, "
+        f"stop_reason={self.stop_reason})"
 
 
 @dataclass

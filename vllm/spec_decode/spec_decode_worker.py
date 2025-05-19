@@ -931,9 +931,9 @@ class SpecDecodeWorker(LoRANotSupportedWorkerBase):
             hidden_states = hidden_states.gather(1, index).squeeze(1)  # b x d
             # Store hidden states from target model for subsequent decode step
             self.previous_hidden_states = HiddenStates(
-                hidden_states_for_all_steps = hidden_states_for_all_steps,
                 hidden_states =hidden_states, seq_group_metadata_list = terminal_metadata,
-                second_last_token_hidden_states = second_last_token_hidden_states)
+                second_last_token_hidden_states = second_last_token_hidden_states,
+                hidden_states_for_all_steps = hidden_states_for_all_steps)
         return accepted_token_ids, logprobs
 
     def _create_output_sampler_list(

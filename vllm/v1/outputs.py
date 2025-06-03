@@ -104,6 +104,11 @@ class ModelRunnerOutput:
     finished_sending: Optional[set[str]] = None
     finished_recving: Optional[set[str]] = None
 
+    # Hidden states for final tokens: req_id -> hidden_states tensor
+    last_hidden_states: Optional[dict[str, torch.Tensor]] = None
+    # Token positions for hidden states: req_id -> positions
+    hidden_states_positions: Optional[dict[str, list[int]]] = None
+
 
 EMPTY_MODEL_RUNNER_OUTPUT = ModelRunnerOutput(req_ids=[],
                                               req_id_to_index={},
@@ -112,4 +117,6 @@ EMPTY_MODEL_RUNNER_OUTPUT = ModelRunnerOutput(req_ids=[],
                                               logprobs=None,
                                               prompt_logprobs_dict={},
                                               finished_sending=None,
-                                              finished_recving=None)
+                                              finished_recving=None,
+                                              last_hidden_states=None,
+                                              hidden_states_positions=None)

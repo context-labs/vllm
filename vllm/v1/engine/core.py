@@ -223,7 +223,7 @@ class EngineCore:
     def _create_hidden_states_sampling_params(self) -> SamplingParams:
         """Create sampling params for hidden states extraction (prefill-only)."""
         return SamplingParams(
-            max_tokens=0,  # No token generation needed, just prefill
+            max_tokens=1,  # Minimum required, but we'll only use prefill activations
             temperature=1.0,  # Doesn't matter since we're not sampling
             top_p=1.0,
             top_k=-1,

@@ -176,6 +176,7 @@ class RequestState:
         stop_reason: Union[int, str, None],
         kv_transfer_params: Optional[dict[str, Any]] = None,
         num_cached_tokens: int = 0,
+        hidden_states: Optional[dict[int, list[float]]] = None,
     ) -> Optional[RequestOutput]:
 
         finished = finish_reason is not None
@@ -198,7 +199,7 @@ class RequestState:
                 return None
 
         return self._new_request_output(request_id, outputs, finished,
-                                        kv_transfer_params, num_cached_tokens)
+                                        kv_transfer_params, num_cached_tokens, hidden_states)
 
     def _new_request_output(
         self,
@@ -207,6 +208,7 @@ class RequestState:
         finished: bool,
         kv_transfer_params: Optional[dict[str, Any]] = None,
         num_cached_tokens: int = 0,
+        hidden_states: Optional[dict[int, list[float]]] = None,
     ) -> RequestOutput:
 
         if self.output_kind == RequestOutputKind.DELTA:
@@ -224,6 +226,7 @@ class RequestState:
             finished=finished,
             kv_transfer_params=kv_transfer_params,
             num_cached_tokens=num_cached_tokens,
+            hidden_states=hidden_states,
         )
 
     def _new_completion_output(
@@ -374,6 +377,7 @@ class OutputProcessor:
             stop_reason = engine_core_output.stop_reason
             kv_transfer_params = engine_core_output.kv_transfer_params
             num_cached_tokens = engine_core_output.num_cached_tokens
+            hidden_states_list = engine_core_output.hidden_states
             req_state.is_prefilling = False
             
             # Track generated tokens for hidden states extraction
@@ -389,10 +393,19 @@ class OutputProcessor:
             # 3) Compute sample and prompt logprobs for request, if required.
             req_state.logprobs_processor.update_from_output(engine_core_output)
 
-            # 4) Create and handle RequestOutput objects.
+            # 4) Process hidden states if present
+            hidden_states_dict = None
+            if hidden_states_list and req_state.original_request and req_state.original_request.return_hidden_states:
+                # Convert list to dict mapping token position to hidden states
+                # For now, we map the last token position to the hidden states
+                # TODO: Support multiple token positions from hidden_states_for_tokens
+                final_token_pos = req_state.get_final_token_position()
+                hidden_states_dict = {final_token_pos: hidden_states_list}
+
+            # 5) Create and handle RequestOutput objects.
             if request_output := req_state.make_request_output(
                     new_token_ids, finish_reason, stop_reason,
-                    kv_transfer_params, num_cached_tokens):
+                    kv_transfer_params, num_cached_tokens, hidden_states_dict):
                 if req_state.queue is not None:
                     # AsyncLLM: put into queue for handling by generate().
                     req_state.queue.put(request_output)

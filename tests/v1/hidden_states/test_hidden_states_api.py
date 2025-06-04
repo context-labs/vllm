@@ -38,10 +38,9 @@ def make_chat_completion_request(
         **kwargs
     }
     
-    # TODO: Add this field when implementing API support
     if return_hidden_states:
-        # payload["return_hidden_states"] = True
-        pass
+        payload["return_hidden_states"] = True
+        payload["hidden_states_for_tokens"] = kwargs.get("hidden_states_for_tokens", [-1])
     
     return payload
 
@@ -62,10 +61,9 @@ def make_completion_request(
         **kwargs
     }
     
-    # TODO: Add this field when implementing API support
     if return_hidden_states:
-        # payload["return_hidden_states"] = True
-        pass
+        payload["return_hidden_states"] = True
+        payload["hidden_states_for_tokens"] = kwargs.get("hidden_states_for_tokens", [-1])
     
     return payload
 
@@ -116,7 +114,7 @@ async def test_chat_completion_without_hidden_states():
 
 @pytest.mark.asyncio
 async def test_chat_completion_with_hidden_states():
-    """Test chat completion with hidden states (will fail until implemented)."""
+    """Test chat completion with hidden states - validate request structure."""
     
     messages = [
         {"role": "user", "content": "Hello, how are you?"}
@@ -127,26 +125,37 @@ async def test_chat_completion_with_hidden_states():
         return_hidden_states=True
     )
     
-    # TODO: This will fail until API support is implemented
-    # Expected structure after implementation
-    try:
-        # TODO: Make actual API call when implementing
-        # response = requests.post(f"{BASE_URL}/v1/chat/completions", json=payload)
-        # assert response.status_code == 200
-        # response_data = response.json()
-        # 
-        # # Verify hidden states are included
-        # choice = response_data["choices"][0]
-        # assert "message" in choice
-        # assert "hidden_states" in choice["message"]
-        # assert isinstance(choice["message"]["hidden_states"], list)
-        # assert len(choice["message"]["hidden_states"]) > 0
-        # assert all(isinstance(x, (int, float)) for x in choice["message"]["hidden_states"])
-        
-        pytest.skip("Hidden states API support not implemented yet")
-        
-    except Exception as e:
-        pytest.skip(f"API endpoint doesn't support hidden states yet: {e}")
+    # Test that the request payload now includes hidden states parameters
+    assert "return_hidden_states" in payload
+    assert payload["return_hidden_states"] is True
+    assert "hidden_states_for_tokens" in payload
+    assert payload["hidden_states_for_tokens"] == [-1]
+    
+    # Test ChatCompletionRequest can be created with hidden states
+    from vllm.entrypoints.openai.protocol import ChatCompletionRequest
+    
+    request = ChatCompletionRequest(**payload)
+    assert request.return_hidden_states is True
+    assert request.hidden_states_for_tokens == [-1]
+    
+    # Test conversion to SamplingParams
+    sampling_params = request.to_sampling_params(
+        default_max_tokens=100,
+        logits_processor_pattern=None
+    )
+    assert sampling_params.return_hidden_states is True
+    assert sampling_params.hidden_states_for_tokens == [-1]
+    
+    # Test response structure can include hidden states
+    from vllm.entrypoints.openai.protocol import ChatCompletionResponseChoice, ChatMessage
+    
+    message = ChatMessage(role="assistant", content="Hello!")
+    choice = ChatCompletionResponseChoice(
+        index=0,
+        message=message,
+        hidden_states=[1.0, 2.0, 3.0]
+    )
+    assert choice.hidden_states == [1.0, 2.0, 3.0]
 
 
 @pytest.mark.asyncio
@@ -189,31 +198,43 @@ async def test_completion_without_hidden_states():
 
 @pytest.mark.asyncio
 async def test_completion_with_hidden_states():
-    """Test completion with hidden states (will fail until implemented)."""
+    """Test completion with hidden states - validate request structure."""
     
     payload = make_completion_request(
         prompt="The capital of France is",
         return_hidden_states=True
     )
     
-    # TODO: This will fail until API support is implemented
-    try:
-        # TODO: Make actual API call when implementing
-        # response = requests.post(f"{BASE_URL}/v1/completions", json=payload)
-        # assert response.status_code == 200
-        # response_data = response.json()
-        # 
-        # # Verify hidden states are included
-        # choice = response_data["choices"][0]
-        # assert "hidden_states" in choice
-        # assert isinstance(choice["hidden_states"], list)
-        # assert len(choice["hidden_states"]) > 0
-        # assert all(isinstance(x, (int, float)) for x in choice["hidden_states"])
-        
-        pytest.skip("Hidden states API support not implemented yet")
-        
-    except Exception as e:
-        pytest.skip(f"API endpoint doesn't support hidden states yet: {e}")
+    # Test that the request payload now includes hidden states parameters
+    assert "return_hidden_states" in payload
+    assert payload["return_hidden_states"] is True
+    assert "hidden_states_for_tokens" in payload
+    assert payload["hidden_states_for_tokens"] == [-1]
+    
+    # Test CompletionRequest can be created with hidden states
+    from vllm.entrypoints.openai.protocol import CompletionRequest
+    
+    request = CompletionRequest(**payload)
+    assert request.return_hidden_states is True
+    assert request.hidden_states_for_tokens == [-1]
+    
+    # Test conversion to SamplingParams
+    sampling_params = request.to_sampling_params(
+        default_max_tokens=100,
+        logits_processor_pattern=None
+    )
+    assert sampling_params.return_hidden_states is True
+    assert sampling_params.hidden_states_for_tokens == [-1]
+    
+    # Test response structure can include hidden states
+    from vllm.entrypoints.openai.protocol import CompletionResponseChoice
+    
+    choice = CompletionResponseChoice(
+        index=0,
+        text="Paris",
+        hidden_states=[4.0, 5.0, 6.0]
+    )
+    assert choice.hidden_states == [4.0, 5.0, 6.0]
 
 
 @pytest.mark.asyncio

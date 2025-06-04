@@ -488,14 +488,23 @@ class OpenAIServingCompletion(OpenAIServing):
                 else:
                     logprobs = None
 
-                choice_data = CompletionResponseChoice(
-                    index=len(choices),
-                    text=output_text,
-                    logprobs=logprobs,
-                    finish_reason=output.finish_reason,
-                    stop_reason=output.stop_reason,
-                    prompt_logprobs=final_res.prompt_logprobs,
-                )
+                # Prepare choice data
+                choice_kwargs = {
+                    "index": len(choices),
+                    "text": output_text,
+                    "logprobs": logprobs,
+                    "finish_reason": output.finish_reason,
+                    "stop_reason": output.stop_reason,
+                    "prompt_logprobs": final_res.prompt_logprobs
+                }
+                
+                # Only include hidden_states if they were extracted and available
+                if (hasattr(final_res, 'hidden_states') and 
+                    final_res.hidden_states is not None and 
+                    output.index in final_res.hidden_states):
+                    choice_kwargs["hidden_states"] = final_res.hidden_states[output.index]
+
+                choice_data = CompletionResponseChoice(**choice_kwargs)
                 choices.append(choice_data)
 
                 num_generated_tokens += len(output.token_ids)

@@ -1042,13 +1042,23 @@ class OpenAIServingChat(OpenAIServing):
                                       reasoning_content=reasoning_content,
                                       content=content)
 
-            choice_data = ChatCompletionResponseChoice(
-                index=output.index,
-                message=message,
-                logprobs=logprobs,
-                finish_reason="tool_calls" if auto_tools_called else
+            # Prepare choice data
+            choice_kwargs = {
+                "index": output.index,
+                "message": message,
+                "logprobs": logprobs,
+                "finish_reason": "tool_calls" if auto_tools_called else
                 output.finish_reason if output.finish_reason else "stop",
-                stop_reason=output.stop_reason)
+                "stop_reason": output.stop_reason
+            }
+            
+            # Only include hidden_states if they were extracted and available
+            if (hasattr(final_res, 'hidden_states') and 
+                final_res.hidden_states is not None and 
+                output.index in final_res.hidden_states):
+                choice_kwargs["hidden_states"] = final_res.hidden_states[output.index]
+
+            choice_data = ChatCompletionResponseChoice(**choice_kwargs)
             choices.append(choice_data)
 
         if request.echo:

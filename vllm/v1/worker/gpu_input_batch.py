@@ -37,6 +37,10 @@ class CachedRequestState:
     mrope_position_delta: Optional[int] = None
 
     lora_request: Optional[LoRARequest] = None
+    
+    # Hidden states configuration
+    return_hidden_states: bool = False
+    hidden_states_for_tokens: Optional[list[int]] = None
 
     def __post_init__(self):
         self.num_prompt_tokens = len(self.prompt_token_ids)

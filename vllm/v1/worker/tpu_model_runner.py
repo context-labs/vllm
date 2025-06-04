@@ -366,6 +366,8 @@ class TPUModelRunner(LoRAModelRunnerMixin):
                 num_computed_tokens=new_req_data.num_computed_tokens,
                 output_token_ids=[],
                 lora_request=new_req_data.lora_request,
+                return_hidden_states=new_req_data.return_hidden_states,
+                hidden_states_for_tokens=new_req_data.hidden_states_for_tokens,
             )
 
             req_ids_to_add.append(req_id)

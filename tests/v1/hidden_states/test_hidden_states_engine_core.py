@@ -58,9 +58,9 @@ def make_request_with_hidden_states(
         arrival_time=time.time(),
         lora_request=None,
         cache_salt=None,
-        # TODO: Add these fields when implementing hidden states
-        # return_hidden_states=return_hidden_states,
-        # hidden_states_for_tokens=None,  # Return for all tokens by default
+        # NOTE: These fields are now implemented
+        return_hidden_states=return_hidden_states,
+        hidden_states_for_tokens=None,  # Return for all tokens by default
     )
 
 
@@ -89,9 +89,10 @@ def test_engine_core_basic_hidden_states(monkeypatch: pytest.MonkeyPatch):
         )
         engine_core.add_request(request_without_hs)
         
-        outputs = engine_core.step()
-        assert outputs is not None
-        assert len(outputs.outputs) >= 0
+        outputs_tuple = engine_core.step()
+        assert outputs_tuple is not None
+        outputs, model_executed = outputs_tuple
+        assert len(outputs) >= 0
         
         # Test request with hidden states (will fail until implemented)
         request_with_hs = make_request_with_hidden_states(
@@ -102,14 +103,16 @@ def test_engine_core_basic_hidden_states(monkeypatch: pytest.MonkeyPatch):
         
         # TODO: This will fail until implementation is complete
         # Expected behavior after implementation:
-        outputs = engine_core.step()
+        outputs_tuple = engine_core.step()
+        outputs, model_executed = outputs_tuple
         
         # Find the output for our request
         target_output = None
-        for output in outputs.outputs:
-            if output.request_id == request_with_hs.request_id:
-                target_output = output
-                break
+        for client_id, client_outputs in outputs.items():
+            for output in client_outputs:
+                if output.request_id == request_with_hs.request_id:
+                    target_output = output
+                    break
         
         if target_output and target_output.finished:
             # TODO: Uncomment when implementation is complete
@@ -150,25 +153,27 @@ def test_engine_core_hidden_states_final_token_only(monkeypatch: pytest.MonkeyPa
         
         # Run until the request is finished
         for _ in range(20):  # Safety limit
-            outputs = engine_core.step()
-            if outputs and outputs.outputs:
-                for output in outputs.outputs:
-                    if output.request_id == request.request_id:
-                        if output.finished:
-                            # TODO: Uncomment when implementation is complete
-                            # assert hasattr(output, 'hidden_states')
-                            # assert output.hidden_states is not None
-                            # outputs_with_hidden_states.append(output)
-                            pass
-                        else:
-                            # Intermediate tokens should not have hidden states
-                            # TODO: Uncomment when implementation is complete
-                            # assert not hasattr(output, 'hidden_states') or output.hidden_states is None
-                            # outputs_without_hidden_states.append(output)
-                            pass
-                        
-                        if output.finished:
-                            break
+            outputs_tuple = engine_core.step()
+            outputs, model_executed = outputs_tuple
+            if outputs:
+                for client_id, client_outputs in outputs.items():
+                    for output in client_outputs:
+                        if output.request_id == request.request_id:
+                            if output.finished:
+                                # TODO: Uncomment when implementation is complete
+                                # assert hasattr(output, 'hidden_states')
+                                # assert output.hidden_states is not None
+                                # outputs_with_hidden_states.append(output)
+                                pass
+                            else:
+                                # Intermediate tokens should not have hidden states
+                                # TODO: Uncomment when implementation is complete
+                                # assert not hasattr(output, 'hidden_states') or output.hidden_states is None
+                                # outputs_without_hidden_states.append(output)
+                                pass
+                            
+                            if output.finished:
+                                break
             else:
                 break
         

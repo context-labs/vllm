@@ -53,9 +53,12 @@ def test_model_runner_output_structure_without_hidden_states(vllm_config: VllmCo
     assert output.req_id_to_index == {"test_req_1": 0}
     assert output.sampled_token_ids == [[123, 456]]
     
-    # These fields should not exist yet
-    assert not hasattr(output, 'last_hidden_states')
-    assert not hasattr(output, 'hidden_states_positions')
+    # These fields should now exist (implemented)
+    assert hasattr(output, 'last_hidden_states')
+    assert hasattr(output, 'hidden_states_positions')
+    # But they should be None when not requested
+    assert output.last_hidden_states is None
+    assert output.hidden_states_positions is None
 
 
 def test_model_runner_output_structure_with_hidden_states(vllm_config: VllmConfig):
@@ -63,36 +66,29 @@ def test_model_runner_output_structure_with_hidden_states(vllm_config: VllmConfi
     
     hidden_size = vllm_config.model_config.hf_config.hidden_size
     
-    # TODO: This will fail until the ModelRunnerOutput is extended
-    # Expected structure after implementation:
-    try:
-        # Create mock hidden states tensor
-        mock_hidden_states = torch.randn(1, hidden_size, dtype=torch.float32)
-        
-        output = ModelRunnerOutput(
-            req_ids=["test_req_1"],
-            req_id_to_index={"test_req_1": 0},
-            sampled_token_ids=[[123]],
-            spec_token_ids=None,
-            logprobs=None,
-            prompt_logprobs_dict={},
-            # TODO: Add these when implementing
-            # last_hidden_states={"test_req_1": mock_hidden_states},
-            # hidden_states_positions={"test_req_1": [0]},
-        )
-        
-        # TODO: Uncomment when implementation is complete
-        # assert hasattr(output, 'last_hidden_states')
-        # assert hasattr(output, 'hidden_states_positions')
-        # assert output.last_hidden_states is not None
-        # assert "test_req_1" in output.last_hidden_states
-        # assert torch.equal(output.last_hidden_states["test_req_1"], mock_hidden_states)
-        
-        pytest.skip("Hidden states fields not implemented yet in ModelRunnerOutput")
-        
-    except TypeError as e:
-        # Expected to fail until implementation
-        pytest.skip(f"ModelRunnerOutput doesn't support hidden states yet: {e}")
+    # Test structure with hidden states fields (now implemented)
+    # Create mock hidden states tensor
+    mock_hidden_states = torch.randn(1, hidden_size, dtype=torch.float32)
+    
+    output = ModelRunnerOutput(
+        req_ids=["test_req_1"],
+        req_id_to_index={"test_req_1": 0},
+        sampled_token_ids=[[123]],
+        spec_token_ids=None,
+        logprobs=None,
+        prompt_logprobs_dict={},
+        # These fields are now implemented
+        last_hidden_states={"test_req_1": mock_hidden_states},
+        hidden_states_positions={"test_req_1": [0]},
+    )
+    
+    # Verify the fields exist and work correctly
+    assert hasattr(output, 'last_hidden_states')
+    assert hasattr(output, 'hidden_states_positions')
+    assert output.last_hidden_states is not None
+    assert "test_req_1" in output.last_hidden_states
+    assert torch.equal(output.last_hidden_states["test_req_1"], mock_hidden_states)
+    assert output.hidden_states_positions["test_req_1"] == [0]
 
 
 def test_hidden_states_tensor_properties(vllm_config: VllmConfig):

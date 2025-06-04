@@ -266,7 +266,7 @@ sequenceDiagram
 
 # Implementation Strategy
 
-## Phase 1: Core Infrastructure 🔄
+## Phase 1: Core Infrastructure ✅
 
 1. **Extend data structures** with hidden states fields
    - [x] `EngineCoreRequest` - Add `return_hidden_states` and `hidden_states_for_tokens` fields
@@ -277,20 +277,25 @@ sequenceDiagram
    - [x] `OutputProcessorOutput.completed_requests` - Add field to track completion info
 
 2. **Add extraction logic** to model forward pass
-   - [ ] Modify `LlamaModel.forward()` to optionally capture hidden states
-   - [ ] Add conditional extraction based on request requirements
+   - [x] Add hidden states extraction logic in GPUModelRunner.execute_model()
+   - [x] Implement `_extract_hidden_states_if_needed()` method for conditional extraction
+   - [x] Add data flow preservation from EngineCoreRequest to CachedRequestState
+   - [x] Update Request, NewRequestData, and CachedRequestState classes with hidden states fields
+   - [x] Handle position-based extraction (final token, specific positions)
    - [ ] Ensure compatibility with torch.compile
    - [ ] Design CUDA graph compatible extraction (static shapes, masked operations)
    - [ ] Handle speculative execution scenarios (multiple tokens per request)
 
 3. **Implement ZMQ-based hidden states pipeline** 
-   - [ ] Add logic to send HiddenStatesExtractionRequest via ZMQ from OutputProcessor
+   - [x] Add logic to send HiddenStatesExtractionRequest via ZMQ from AsyncLLM and LLMEngine
    - [x] Implement EngineCoreRequestType.HIDDEN_STATES_EXTRACT handling in EngineCore
    - [x] Add ZMQ decoder for HiddenStatesExtractionRequest messages
    - [x] Implement EngineCore._handle_hidden_states_request() method
    - [x] Add OutputProcessor logic to track completed requests requiring hidden states
-   - [ ] Add hidden states extraction logic in GPUModelRunner.execute_model()
-   - [ ] Handle memory management for hidden states tensors  
+   - [x] Add hidden states extraction logic in GPUModelRunner.execute_model()
+   - [x] Handle memory management for hidden states tensors (GPU→CPU transfer)
+   - [x] Implement ZMQ client logic in AsyncLLM._process_hidden_states_requests()
+   - [x] Implement ZMQ client logic in LLMEngine._process_hidden_states_requests()
    - [ ] Implement response routing back to requesting component
 
 4. **Add serialization helpers** for ZMQ transfer

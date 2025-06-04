@@ -69,6 +69,28 @@ class EngineCoreRequest(
     hidden_states_for_tokens: Optional[list[int]] = None
 
 
+class HiddenStatesExtractionRequest(
+        msgspec.Struct,
+        array_like=True,  # type: ignore[call-arg]
+        omit_defaults=True,  # type: ignore[call-arg]
+        gc=False):  # type: ignore[call-arg]
+    """Request for extracting hidden states from a completed sequence."""
+
+    request_id: str
+    original_request_id: str
+    sequence_tokens: list[int]  # Full sequence: prompt + generated tokens
+    target_position: int  # Position to extract (-1 for last token)
+    arrival_time: float
+    
+    # Optional: for future extensibility
+    layer_indices: Optional[list[int]] = None  # Specific layers (default: final layer)
+    extract_all_positions: bool = False
+    
+    # Standard request fields for compatibility
+    client_index: int = 0
+    current_wave: int = 0
+
+
 class EngineCoreEventType(enum.IntEnum):
     """The type of engine core request event."""
     QUEUED = 1
@@ -176,3 +198,5 @@ class EngineCoreRequestType(enum.Enum):
     UTILITY = b'\x03'
     # Sentinel used within EngineCoreProc.
     EXECUTOR_FAILED = b'\x04'
+    # Hidden states extraction request
+    HIDDEN_STATES_EXTRACT = b'\x05'

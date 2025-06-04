@@ -16,6 +16,7 @@ import msgspec
 import zmq
 
 from vllm.config import ParallelConfig, VllmConfig
+from vllm.sampling_params import SamplingParams
 from vllm.distributed import stateless_destroy_torch_distributed_process_group
 from vllm.executor.multiproc_worker_utils import _add_prefix
 from vllm.logger import init_logger
@@ -30,7 +31,8 @@ from vllm.v1.core.sched.interface import SchedulerInterface
 from vllm.v1.core.sched.output import SchedulerOutput
 from vllm.v1.core.sched.scheduler import Scheduler as V1Scheduler
 from vllm.v1.engine import (EngineCoreOutputs, EngineCoreRequest,
-                            EngineCoreRequestType, UtilityOutput)
+                            EngineCoreRequestType, HiddenStatesExtractionRequest,
+                            UtilityOutput)
 from vllm.v1.engine.mm_input_cache import MirroredProcessingCache
 from vllm.v1.executor.abstract import Executor
 from vllm.v1.kv_cache_interface import KVCacheConfig
@@ -194,6 +196,41 @@ class EngineCore:
                            "Disabling KVTransfer for this request.")
 
         self.scheduler.add_request(req)
+
+    def _handle_hidden_states_request(self, hs_request: HiddenStatesExtractionRequest):
+        """Handle hidden states extraction request by performing prefill."""
+        
+        # Convert hidden states request to regular EngineCoreRequest for prefill
+        prefill_request = EngineCoreRequest(
+            request_id=hs_request.request_id,
+            prompt_token_ids=hs_request.sequence_tokens,
+            mm_inputs=None,
+            mm_hashes=None, 
+            mm_placeholders=None,
+            sampling_params=self._create_hidden_states_sampling_params(),
+            eos_token_id=None,  # Not needed for prefill-only
+            arrival_time=hs_request.arrival_time,
+            lora_request=None,  # TODO: Preserve from original if needed
+            cache_salt=None,
+            return_hidden_states=True,  # This is the key difference
+            hidden_states_for_tokens=[hs_request.target_position]
+        )
+        
+        # Add the request for immediate processing
+        # Note: This will be processed in the next scheduler step
+        self.add_request(prefill_request)
+    
+    def _create_hidden_states_sampling_params(self) -> SamplingParams:
+        """Create sampling params for hidden states extraction (prefill-only)."""
+        return SamplingParams(
+            max_tokens=0,  # No token generation needed, just prefill
+            temperature=1.0,  # Doesn't matter since we're not sampling
+            top_p=1.0,
+            top_k=-1,
+            stop=[],  # No stop conditions needed
+            include_stop_str_in_output=False,
+            detokenize=False,  # We only need hidden states, not text
+        )
 
     def abort_requests(self, request_ids: list[str]):
         """Abort requests from the scheduler."""
@@ -578,6 +615,8 @@ class EngineCoreProc(EngineCore):
                                           f" failed: {str(e)}")
             self.output_queue.put_nowait(
                 (client_idx, EngineCoreOutputs(utility_output=output)))
+        elif request_type == EngineCoreRequestType.HIDDEN_STATES_EXTRACT:
+            self._handle_hidden_states_request(request)
         elif request_type == EngineCoreRequestType.EXECUTOR_FAILED:
             raise RuntimeError("Executor failed.")
         else:
@@ -617,6 +656,7 @@ class EngineCoreProc(EngineCore):
 
         # Msgpack serialization decoding.
         add_request_decoder = MsgpackDecoder(EngineCoreRequest)
+        hidden_states_decoder = MsgpackDecoder(HiddenStatesExtractionRequest)
         generic_decoder = MsgpackDecoder()
 
         with ExitStack() as stack, zmq.Context() as ctx:
@@ -661,9 +701,12 @@ class EngineCoreProc(EngineCore):
                         bytes(type_frame.buffer))
 
                     # Deserialize the request data.
-                    decoder = add_request_decoder if (
-                        request_type
-                        == EngineCoreRequestType.ADD) else generic_decoder
+                    if request_type == EngineCoreRequestType.ADD:
+                        decoder = add_request_decoder
+                    elif request_type == EngineCoreRequestType.HIDDEN_STATES_EXTRACT:
+                        decoder = hidden_states_decoder
+                    else:
+                        decoder = generic_decoder
                     request = decoder.decode(data_frames)
 
                     # Push to input queue for core busy loop.

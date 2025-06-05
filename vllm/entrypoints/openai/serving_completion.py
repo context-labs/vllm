@@ -501,8 +501,32 @@ class OpenAIServingCompletion(OpenAIServing):
                 # Only include hidden_states if they were extracted and available
                 if (hasattr(final_res, 'hidden_states') and 
                     final_res.hidden_states is not None and 
-                    output.index in final_res.hidden_states):
-                    choice_kwargs["hidden_states"] = final_res.hidden_states[output.index]
+                    request.return_hidden_states):
+                    # Hidden states are keyed by token position, not output index
+                    # For completions, we typically want the last token's hidden states
+                    if final_res.hidden_states:
+                        # If user requested specific token positions, use those
+                        # Otherwise use the last available token position
+                        if request.hidden_states_for_tokens:
+                            # Handle -1 as last token position
+                            requested_positions = []
+                            total_tokens = len(final_res.prompt_token_ids or []) + len(output.token_ids)
+                            for pos in request.hidden_states_for_tokens:
+                                if pos == -1:
+                                    # Last token position (convert to absolute position)
+                                    requested_positions.append(total_tokens - 1)
+                                else:
+                                    requested_positions.append(pos)
+                            
+                            # Find the first available position from the requested ones
+                            for pos in requested_positions:
+                                if pos in final_res.hidden_states:
+                                    choice_kwargs["hidden_states"] = final_res.hidden_states[pos]
+                                    break
+                        else:
+                            # No specific positions requested, use last available
+                            last_pos = max(final_res.hidden_states.keys())
+                            choice_kwargs["hidden_states"] = final_res.hidden_states[last_pos]
 
                 choice_data = CompletionResponseChoice(**choice_kwargs)
                 choices.append(choice_data)

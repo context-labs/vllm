@@ -141,11 +141,7 @@ class TestHiddenStatesAPI:
         choice_dict = choice.model_dump()
         
         # With exclude_if_none, hidden_states should not be present when None
-        if "hidden_states" in choice_dict:
-            assert choice_dict["hidden_states"] is None
-            print("   NOTE: hidden_states field present but None (expected with current implementation)")
-        else:
-            print("   ✅ hidden_states field properly excluded")
+        assert "hidden_states" not in choice_dict, "hidden_states field should not be present when None"
     
     def test_completion_with_hidden_states(self, server):
         """Test completion with hidden states extraction."""
@@ -174,16 +170,9 @@ class TestHiddenStatesAPI:
         assert "text" in choice
         
         print(f"   Response received: {choice.get('text', '')[:50]}...")
-        
-        if "hidden_states" in choice:
-            if choice["hidden_states"] is not None:
-                assert isinstance(choice["hidden_states"], list)
-                assert len(choice["hidden_states"]) > 0
-                print(f"   ✅ Hidden states extracted: {len(choice['hidden_states'])} dimensions")
-            else:
-                print("   📝 Hidden states requested but None returned (pipeline may not be fully connected)")
-        else:
-            print("   📝 Hidden states field not present (may indicate exclude_if_none is working)")
+
+        assert "hidden_states" in choice, "hidden_states field should be present"
+        assert choice["hidden_states"] is not None, "hidden_states should not be None"
     
     def test_invalid_hidden_states_parameters(self, server):
         """Test API validation for invalid hidden states parameters."""

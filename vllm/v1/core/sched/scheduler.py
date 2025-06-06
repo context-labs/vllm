@@ -797,6 +797,16 @@ class Scheduler(SchedulerInterface):
             prompt_logprobs_tensors = prompt_logprobs_dict.get(req_id)
             if new_token_ids or kv_transfer_params:
 
+                # Extract hidden states if requested and available
+                hidden_states = None
+                if (request.return_hidden_states and 
+                    model_runner_output.last_hidden_states and 
+                    req_id in model_runner_output.last_hidden_states):
+                    # Convert tensor to flat list for serialization
+                    hidden_states_tensor = model_runner_output.last_hidden_states[req_id]
+                    # Flatten tensor and convert to list of floats
+                    hidden_states = hidden_states_tensor.cpu().float().flatten().tolist()
+
                 # Add EngineCoreOutput for this Request.
                 outputs[request.client_index].append(
                     EngineCoreOutput(
@@ -809,6 +819,7 @@ class Scheduler(SchedulerInterface):
                         events=request.take_events(),
                         kv_transfer_params=kv_transfer_params,
                         num_cached_tokens=request.num_cached_tokens,
+                        hidden_states=hidden_states,
                     ))
 
             else:

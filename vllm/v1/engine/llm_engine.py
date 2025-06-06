@@ -22,6 +22,7 @@ from vllm.transformers_utils.tokenizer_group import (
     TokenizerGroup, init_tokenizer_from_configs)
 from vllm.usage.usage_lib import UsageContext
 from vllm.utils import Device
+from vllm.v1.engine import HiddenStatesExtractionRequest, EngineCoreRequestType
 from vllm.v1.engine.core_client import EngineCoreClient
 from vllm.v1.engine.output_processor import OutputProcessor
 from vllm.v1.engine.parallel_sampling import ParentRequest
@@ -239,8 +240,11 @@ class LLMEngine:
 
         # 3) Abort any reqs that finished due to stop strings.
         self.engine_core.abort_requests(processed_outputs.reqs_to_abort)
+        
+        # 4) Send hidden states extraction requests for completed requests
+        self._process_hidden_states_requests(processed_outputs.completed_requests)
 
-        # 4) Record stats
+        # 5) Record stats
         if self.stat_logger is not None:
             assert outputs.scheduler_stats is not None
             self.stat_logger.record(scheduler_stats=outputs.scheduler_stats,
@@ -310,6 +314,36 @@ class LLMEngine:
                        args: tuple = (),
                        kwargs: Optional[dict[str, Any]] = None) -> list[_R]:
         return self.engine_core.collective_rpc(method, timeout, args, kwargs)
+
+    def _process_hidden_states_requests(self, completed_requests: list) -> None:
+        """
+        Process completed requests that need hidden states extraction.
+        
+        This implements the ZMQ client logic for the Post-Sampling Prefill Strategy.
+        For each completed request that needs hidden states, send a 
+        HiddenStatesExtractionRequest via ZMQ to the EngineCore.
+        """
+        import time
+        
+        for completed_info in completed_requests:
+            # Create HiddenStatesExtractionRequest
+            hs_request = HiddenStatesExtractionRequest(
+                request_id=f"hs_{completed_info.request_id}",
+                original_request_id=completed_info.request_id,
+                sequence_tokens=completed_info.sequence_tokens,
+                target_position=completed_info.final_token_position,
+                arrival_time=time.time(),
+                # Optional fields for future extensibility
+                layer_indices=None,  # Default: final layer only
+                extract_all_positions=False,  # Default: target position only
+            )
+            
+            # Send the hidden states extraction request via ZMQ
+            # Use the _send_input method with HIDDEN_STATES_EXTRACT request type
+            self.engine_core._send_input(
+                EngineCoreRequestType.HIDDEN_STATES_EXTRACT, 
+                hs_request
+            )
 
     def __del__(self):
         if dp_group := getattr(self, "dp_group", None):

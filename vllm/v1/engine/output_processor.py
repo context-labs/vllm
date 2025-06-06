@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import asyncio
+import time
 from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Any, Optional, Union
@@ -9,7 +10,9 @@ from vllm.outputs import CompletionOutput, RequestOutput
 from vllm.sampling_params import RequestOutputKind
 from vllm.transformers_utils.tokenizer import AnyTokenizer
 from vllm.transformers_utils.tokenizer_group import TokenizerGroup
-from vllm.v1.engine import EngineCoreOutput, EngineCoreRequest, FinishReason
+from vllm.v1.engine import (EngineCoreOutput, EngineCoreRequest, FinishReason,
+                                 HiddenStatesExtractionRequest, 
+                                 EngineCoreRequestType)
 from vllm.v1.engine.detokenizer import IncrementalDetokenizer
 from vllm.v1.engine.logprobs import LogprobsProcessor
 from vllm.v1.engine.parallel_sampling import ParentRequest
@@ -63,10 +66,22 @@ class RequestOutputCollector:
 
 
 @dataclass
+class CompletedRequestInfo:
+    """Information about a completed request that may need hidden states extraction."""
+    
+    request_id: str
+    original_request: EngineCoreRequest
+    sequence_tokens: list[int]  # Full sequence: prompt + generated tokens
+    final_token_position: int   # Position of the last token
+
+
+@dataclass
 class OutputProcessorOutput:
 
     request_outputs: list[RequestOutput]
     reqs_to_abort: list[str]
+    # NEW: Information about completed requests for potential hidden states extraction
+    completed_requests: list[CompletedRequestInfo]
 
 
 class RequestState:
@@ -94,12 +109,14 @@ class RequestState:
         self.output_kind = output_kind
         self.prompt = prompt
         self.prompt_token_ids = prompt_token_ids
+        self.original_request: Optional[EngineCoreRequest] = None  # Store for hidden states
         self.prompt_len = len(prompt_token_ids)
         self.logprobs_processor = logprobs_processor
         self.detokenizer = detokenizer
         self.max_tokens_param = max_tokens_param
         self.is_prefilling = True
         self.queue = queue
+        self.generated_token_ids: list[int] = []  # Track generated tokens for hidden states
 
         self.stats = RequestStateStats(
             arrival_time=arrival_time) if log_stats else None
@@ -117,7 +134,7 @@ class RequestState:
     ) -> "RequestState":
         if not request.sampling_params.detokenize:
             tokenizer = None
-        return cls(
+        req_state = cls(
             request_id=request.request_id,
             parent_req=parent_req,
             request_index=request_index,
@@ -140,6 +157,17 @@ class RequestState:
             queue=queue,
             log_stats=log_stats,
         )
+        # Store the original request for hidden states extraction
+        req_state.original_request = request
+        return req_state
+    
+    def get_full_sequence(self) -> list[int]:
+        """Get the complete token sequence: prompt + generated tokens."""
+        return self.prompt_token_ids + self.generated_token_ids
+    
+    def get_final_token_position(self) -> int:
+        """Get the position of the final token in the sequence."""
+        return len(self.get_full_sequence()) - 1
 
     def make_request_output(
         self,
@@ -148,6 +176,7 @@ class RequestState:
         stop_reason: Union[int, str, None],
         kv_transfer_params: Optional[dict[str, Any]] = None,
         num_cached_tokens: int = 0,
+        hidden_states: Optional[dict[int, list[float]]] = None,
     ) -> Optional[RequestOutput]:
 
         finished = finish_reason is not None
@@ -170,7 +199,7 @@ class RequestState:
                 return None
 
         return self._new_request_output(request_id, outputs, finished,
-                                        kv_transfer_params, num_cached_tokens)
+                                        kv_transfer_params, num_cached_tokens, hidden_states)
 
     def _new_request_output(
         self,
@@ -179,6 +208,7 @@ class RequestState:
         finished: bool,
         kv_transfer_params: Optional[dict[str, Any]] = None,
         num_cached_tokens: int = 0,
+        hidden_states: Optional[dict[int, list[float]]] = None,
     ) -> RequestOutput:
 
         if self.output_kind == RequestOutputKind.DELTA:
@@ -196,6 +226,7 @@ class RequestState:
             finished=finished,
             kv_transfer_params=kv_transfer_params,
             num_cached_tokens=num_cached_tokens,
+            hidden_states=hidden_states,
         )
 
     def _new_completion_output(
@@ -327,6 +358,8 @@ class OutputProcessor:
 
         request_outputs: list[RequestOutput] = []
         reqs_to_abort: list[str] = []
+        completed_requests: list[CompletedRequestInfo] = []  # NEW: Track completed requests
+        
         for engine_core_output in engine_core_outputs:
             req_id = engine_core_output.request_id
             req_state = self.request_states.get(req_id)
@@ -344,7 +377,11 @@ class OutputProcessor:
             stop_reason = engine_core_output.stop_reason
             kv_transfer_params = engine_core_output.kv_transfer_params
             num_cached_tokens = engine_core_output.num_cached_tokens
+            hidden_states_list = engine_core_output.hidden_states
             req_state.is_prefilling = False
+            
+            # Track generated tokens for hidden states extraction
+            req_state.generated_token_ids.extend(new_token_ids)
 
             # 2) Detokenize the token ids into text and perform stop checks.
             stop_string = req_state.detokenizer.update(
@@ -356,10 +393,19 @@ class OutputProcessor:
             # 3) Compute sample and prompt logprobs for request, if required.
             req_state.logprobs_processor.update_from_output(engine_core_output)
 
-            # 4) Create and handle RequestOutput objects.
+            # 4) Process hidden states if present
+            hidden_states_dict = None
+            if hidden_states_list and req_state.original_request and req_state.original_request.return_hidden_states:
+                # Convert list to dict mapping token position to hidden states
+                # For now, we map the last token position to the hidden states
+                # TODO: Support multiple token positions from hidden_states_for_tokens
+                final_token_pos = req_state.get_final_token_position()
+                hidden_states_dict = {final_token_pos: hidden_states_list}
+
+            # 5) Create and handle RequestOutput objects.
             if request_output := req_state.make_request_output(
                     new_token_ids, finish_reason, stop_reason,
-                    kv_transfer_params, num_cached_tokens):
+                    kv_transfer_params, num_cached_tokens, hidden_states_dict):
                 if req_state.queue is not None:
                     # AsyncLLM: put into queue for handling by generate().
                     req_state.queue.put(request_output)
@@ -369,6 +415,17 @@ class OutputProcessor:
 
             # Free completed requests.
             if finish_reason is not None:
+                # NEW: Check if this completed request needs hidden states extraction
+                if (req_state.original_request and 
+                    req_state.original_request.return_hidden_states):
+                    completed_request_info = CompletedRequestInfo(
+                        request_id=req_id,
+                        original_request=req_state.original_request,
+                        sequence_tokens=req_state.get_full_sequence(),
+                        final_token_position=req_state.get_final_token_position()
+                    )
+                    completed_requests.append(completed_request_info)
+                
                 self.request_states.pop(req_id)
                 # Remove parent request if applicable.
                 parent_req = req_state.parent_req
@@ -388,6 +445,7 @@ class OutputProcessor:
         return OutputProcessorOutput(
             request_outputs=request_outputs,
             reqs_to_abort=reqs_to_abort,
+            completed_requests=completed_requests,
         )
 
     def _update_stats_from_output(self, req_state: RequestState,

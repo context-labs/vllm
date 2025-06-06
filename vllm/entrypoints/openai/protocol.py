@@ -11,7 +11,7 @@ import regex as re
 import torch
 from fastapi import HTTPException, UploadFile
 from pydantic import (BaseModel, ConfigDict, Field, TypeAdapter,
-                      ValidationInfo, field_validator, model_validator)
+                      ValidationInfo, field_validator, model_validator, model_serializer)
 from typing_extensions import TypeAlias
 
 from vllm import envs
@@ -35,6 +35,8 @@ class OpenAIBaseModel(BaseModel):
 
     # Cache class field names
     field_names: ClassVar[Optional[set[str]]] = None
+
+    exclude_if_none_fields : ClassVar[list[str]] = []
 
     @model_validator(mode="wrap")
     @classmethod
@@ -60,6 +62,10 @@ class OpenAIBaseModel(BaseModel):
                 data.keys() - field_names,
             )
         return result
+
+    @model_serializer
+    def _serialize(self):
+        return exclude_if_none(self, self.__class__.exclude_if_none_fields)
 
 
 class ErrorResponse(OpenAIBaseModel):
@@ -410,6 +416,22 @@ class ChatCompletionRequest(OpenAIBaseModel):
     kv_transfer_params: Optional[dict[str, Any]] = Field(
         default=None,
         description="KVTransfer parameters used for disaggregated serving.")
+    
+    # Hidden states extraction parameters
+    return_hidden_states: bool = Field(
+        default=False,
+        description=(
+            "If true, extract and return hidden states (pre-LM head activations) "
+            "for the final token of the generated sequence. The hidden states are "
+            "extracted using vLLM's Post-Sampling Prefill Strategy for maximum "
+            "accuracy. Only supported by vLLM engine V1."))
+    hidden_states_for_tokens: Optional[list[int]] = Field(
+        default=None,
+        description=(
+            "List of token positions to extract hidden states for. Use -1 for "
+            "the final token position (default). Positive integers specify "
+            "absolute positions in the sequence. Only used when return_hidden_states=True. "
+            "Only supported by vLLM engine V1."))
 
     # --8<-- [end:chat-completion-extra-params]
 
@@ -549,7 +571,9 @@ class ChatCompletionRequest(OpenAIBaseModel):
             guided_decoding=guided_decoding,
             logit_bias=self.logit_bias,
             extra_args=({"kv_transfer_params": self.kv_transfer_params}
-                        if self.kv_transfer_params else None))
+                        if self.kv_transfer_params else None),
+            return_hidden_states=self.return_hidden_states,
+            hidden_states_for_tokens=self.hidden_states_for_tokens)
 
     def _get_guided_json_from_tool(
             self) -> Optional[Union[str, dict, BaseModel]]:
@@ -861,6 +885,22 @@ class CompletionRequest(OpenAIBaseModel):
     kv_transfer_params: Optional[dict[str, Any]] = Field(
         default=None,
         description="KVTransfer parameters used for disaggregated serving.")
+    
+    # Hidden states extraction parameters
+    return_hidden_states: bool = Field(
+        default=False,
+        description=(
+            "If true, extract and return hidden states (pre-LM head activations) "
+            "for the final token of the generated sequence. The hidden states are "
+            "extracted using vLLM's Post-Sampling Prefill Strategy for maximum "
+            "accuracy. Only supported by vLLM engine V1."))
+    hidden_states_for_tokens: Optional[list[int]] = Field(
+        default=None,
+        description=(
+            "List of token positions to extract hidden states for. Use -1 for "
+            "the final token position (default). Positive integers specify "
+            "absolute positions in the sequence. Only used when return_hidden_states=True. "
+            "Only supported by vLLM engine V1."))
 
     # --8<-- [end:completion-extra-params]
 
@@ -989,7 +1029,9 @@ class CompletionRequest(OpenAIBaseModel):
             logit_bias=self.logit_bias,
             allowed_token_ids=self.allowed_token_ids,
             extra_args=({"kv_transfer_params": self.kv_transfer_params}
-                        if self.kv_transfer_params else None))
+                        if self.kv_transfer_params else None),
+            return_hidden_states=self.return_hidden_states,
+            hidden_states_for_tokens=self.hidden_states_for_tokens)
 
     @model_validator(mode="before")
     @classmethod
@@ -1226,6 +1268,8 @@ class CompletionLogProbs(OpenAIBaseModel):
 
 
 class CompletionResponseChoice(OpenAIBaseModel):
+    exclude_if_none_fields = ["hidden_states"]
+    
     index: int
     text: str
     logprobs: Optional[CompletionLogProbs] = None
@@ -1238,6 +1282,13 @@ class CompletionResponseChoice(OpenAIBaseModel):
             "including encountering the EOS token"),
     )
     prompt_logprobs: Optional[list[Optional[dict[int, Logprob]]]] = None
+    # Hidden states extraction (vLLM extension)
+    hidden_states: Optional[list[float]] = Field(
+        default=None,
+        description=(
+            "Hidden states (pre-LM head activations) for the final token "
+            "of the generated sequence. Only included when return_hidden_states=True. "
+            "A vLLM extension to the OpenAI API."))
 
 
 class CompletionResponse(OpenAIBaseModel):
@@ -1252,6 +1303,8 @@ class CompletionResponse(OpenAIBaseModel):
 
 
 class CompletionResponseStreamChoice(OpenAIBaseModel):
+    exclude_if_none_fields = ["hidden_states"]
+    
     index: int
     text: str
     logprobs: Optional[CompletionLogProbs] = None
@@ -1262,6 +1315,15 @@ class CompletionResponseStreamChoice(OpenAIBaseModel):
             "The stop string or token id that caused the completion "
             "to stop, None if the completion finished for some other reason "
             "including encountering the EOS token"),
+    )
+    # Hidden states extraction (vLLM extension)
+    hidden_states: Optional[list[float]] = Field(
+        default=None,
+        description=(
+            "Hidden states (pre-LM head activations) for the final token "
+            "in the completion. Only included if return_hidden_states=True "
+            "in the request and this is the final chunk with finish_reason."
+        )
     )
 
 
@@ -1421,6 +1483,8 @@ class ChatCompletionLogProbs(OpenAIBaseModel):
 
 
 class ChatCompletionResponseChoice(OpenAIBaseModel):
+    exclude_if_none_fields = ["hidden_states"]
+    
     index: int
     message: ChatMessage
     logprobs: Optional[ChatCompletionLogProbs] = None
@@ -1428,6 +1492,13 @@ class ChatCompletionResponseChoice(OpenAIBaseModel):
     finish_reason: Optional[str] = "stop"
     # not part of the OpenAI spec but included in vLLM for legacy reasons
     stop_reason: Optional[Union[int, str]] = None
+    # Hidden states extraction (vLLM extension)
+    hidden_states: Optional[list[float]] = Field(
+        default=None,
+        description=(
+            "Hidden states (pre-LM head activations) for the final token "
+            "of the generated sequence. Only included when return_hidden_states=True. "
+            "A vLLM extension to the OpenAI API."))
 
 
 class ChatCompletionResponse(OpenAIBaseModel):
@@ -1443,10 +1514,21 @@ class ChatCompletionResponse(OpenAIBaseModel):
 
 
 class DeltaMessage(OpenAIBaseModel):
+    exclude_if_none_fields = ["hidden_states"]
+    
     role: Optional[str] = None
     content: Optional[str] = None
     reasoning_content: Optional[str] = None
     tool_calls: list[DeltaToolCall] = Field(default_factory=list)
+    # Hidden states extraction (vLLM extension)
+    hidden_states: Optional[list[float]] = Field(
+        default=None,
+        description=(
+            "Hidden states (pre-LM head activations) for the final token "
+            "in the completion. Only included if return_hidden_states=True "
+            "in the request and this is the final chunk with finish_reason."
+        )
+    )
 
 
 class ChatCompletionResponseStreamChoice(OpenAIBaseModel):
@@ -1892,3 +1974,8 @@ class TranscriptionResponseVerbose(OpenAIBaseModel):
 
     words: Optional[list[TranscriptionWord]] = None
     """Extracted words and their corresponding timestamps."""
+
+
+def exclude_if_none(obj, field_names: list[str]):
+    omit_if_none_fields = {k for k, v in obj.model_fields.items() if k in field_names}
+    return {k: v for k, v in obj if k not in omit_if_none_fields or v is not None}

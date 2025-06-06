@@ -26,7 +26,7 @@ from vllm.transformers_utils.tokenizer import AnyTokenizer
 from vllm.transformers_utils.tokenizer_group import init_tokenizer_from_configs
 from vllm.usage.usage_lib import UsageContext
 from vllm.utils import Device, cdiv
-from vllm.v1.engine import EngineCoreRequest
+from vllm.v1.engine import EngineCoreRequest, HiddenStatesExtractionRequest
 from vllm.v1.engine.core_client import AsyncMPClient, DPAsyncMPClient
 from vllm.v1.engine.exceptions import EngineDeadError, EngineGenerateError
 from vllm.v1.engine.output_processor import (OutputProcessor,
@@ -404,8 +404,12 @@ class AsyncLLM(EngineClient):
                         # 3) Abort any reqs that finished due to stop strings.
                         await engine_core.abort_requests_async(
                             processed_outputs.reqs_to_abort)
+                        
+                        # 4) Send hidden states extraction requests for completed requests
+                        await self._process_hidden_states_requests(
+                            engine_core, processed_outputs.completed_requests)
 
-                    # 4) Logging.
+                    # 5) Logging.
                     # TODO(rob): make into a coroutine and launch it in
                     # background thread once Prometheus overhead is non-trivial.
                     if stat_loggers:
@@ -440,6 +444,41 @@ class AsyncLLM(EngineClient):
         for stat_logger in stat_loggers:
             stat_logger.record(scheduler_stats=scheduler_stats,
                                iteration_stats=iteration_stats)
+
+    async def _process_hidden_states_requests(
+        self, 
+        engine_core,
+        completed_requests: list
+    ) -> None:
+        """
+        Process completed requests that need hidden states extraction.
+        
+        This implements the ZMQ client logic for the Post-Sampling Prefill Strategy.
+        For each completed request that needs hidden states, send a 
+        HiddenStatesExtractionRequest via ZMQ to the EngineCore.
+        """
+        import time
+        from vllm.v1.engine import EngineCoreRequestType
+        
+        for completed_info in completed_requests:
+            # Create HiddenStatesExtractionRequest
+            hs_request = HiddenStatesExtractionRequest(
+                request_id=f"hs_{completed_info.request_id}",
+                original_request_id=completed_info.request_id,
+                sequence_tokens=completed_info.sequence_tokens,
+                target_position=completed_info.final_token_position,
+                arrival_time=time.time(),
+                # Optional fields for future extensibility
+                layer_indices=None,  # Default: final layer only
+                extract_all_positions=False,  # Default: target position only
+            )
+            
+            # Send the hidden states extraction request via ZMQ
+            # Use the _send_input method with HIDDEN_STATES_EXTRACT request type
+            await engine_core._send_input(
+                EngineCoreRequestType.HIDDEN_STATES_EXTRACT, 
+                hs_request
+            )
 
     def encode(
         self,

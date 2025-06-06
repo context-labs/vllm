@@ -372,19 +372,46 @@ class OpenAIServingCompletion(OpenAIServing):
                     finish_reason = output.finish_reason
                     stop_reason = output.stop_reason
 
+                    # Prepare choice kwargs
+                    choice_kwargs = {
+                        "index": i,
+                        "text": delta_text,
+                        "logprobs": logprobs,
+                        "finish_reason": finish_reason,
+                        "stop_reason": stop_reason,
+                    }
+
+                    # Add hidden states only if this is the final chunk and they were requested
+                    if (finish_reason is not None and 
+                        hasattr(res, 'hidden_states') and 
+                        res.hidden_states is not None and 
+                        request.return_hidden_states):
+                        # Hidden states are keyed by token position, not output index
+                        if res.hidden_states:
+                            # If user requested specific token positions, use those
+                            # Otherwise use the last available token position
+                            if request.hidden_states_for_tokens:
+                                # Handle -1 as last token position by using the last available position
+                                if -1 in request.hidden_states_for_tokens:
+                                    # For -1, use the last available position in hidden_states
+                                    last_pos = max(res.hidden_states.keys())
+                                    choice_kwargs["hidden_states"] = res.hidden_states[last_pos]
+                                else:
+                                    # Look for specific positions
+                                    for pos in request.hidden_states_for_tokens:
+                                        if pos in res.hidden_states:
+                                            choice_kwargs["hidden_states"] = res.hidden_states[pos]
+                                            break
+                            else:
+                                # No specific positions requested, use last available
+                                last_pos = max(res.hidden_states.keys())
+                                choice_kwargs["hidden_states"] = res.hidden_states[last_pos]
+
                     chunk = CompletionStreamResponse(
                         id=request_id,
                         created=created_time,
                         model=model_name,
-                        choices=[
-                            CompletionResponseStreamChoice(
-                                index=i,
-                                text=delta_text,
-                                logprobs=logprobs,
-                                finish_reason=finish_reason,
-                                stop_reason=stop_reason,
-                            )
-                        ])
+                        choices=[CompletionResponseStreamChoice(**choice_kwargs)])
                     if include_continuous_usage:
                         prompt_tokens = num_prompt_tokens[prompt_idx]
                         completion_tokens = previous_num_tokens[i]
@@ -488,14 +515,47 @@ class OpenAIServingCompletion(OpenAIServing):
                 else:
                     logprobs = None
 
-                choice_data = CompletionResponseChoice(
-                    index=len(choices),
-                    text=output_text,
-                    logprobs=logprobs,
-                    finish_reason=output.finish_reason,
-                    stop_reason=output.stop_reason,
-                    prompt_logprobs=final_res.prompt_logprobs,
-                )
+                # Prepare choice data
+                choice_kwargs = {
+                    "index": len(choices),
+                    "text": output_text,
+                    "logprobs": logprobs,
+                    "finish_reason": output.finish_reason,
+                    "stop_reason": output.stop_reason,
+                    "prompt_logprobs": final_res.prompt_logprobs
+                }
+                
+                # Only include hidden_states if they were extracted and available
+                if (hasattr(final_res, 'hidden_states') and 
+                    final_res.hidden_states is not None and 
+                    request.return_hidden_states):
+                    # Hidden states are keyed by token position, not output index
+                    # For completions, we typically want the last token's hidden states
+                    if final_res.hidden_states:
+                        # If user requested specific token positions, use those
+                        # Otherwise use the last available token position
+                        if request.hidden_states_for_tokens:
+                            # Handle -1 as last token position
+                            requested_positions = []
+                            total_tokens = len(final_res.prompt_token_ids or []) + len(output.token_ids)
+                            for pos in request.hidden_states_for_tokens:
+                                if pos == -1:
+                                    # Last token position (convert to absolute position)
+                                    requested_positions.append(total_tokens - 1)
+                                else:
+                                    requested_positions.append(pos)
+                            
+                            # Find the first available position from the requested ones
+                            for pos in requested_positions:
+                                if pos in final_res.hidden_states:
+                                    choice_kwargs["hidden_states"] = final_res.hidden_states[pos]
+                                    break
+                        else:
+                            # No specific positions requested, use last available
+                            last_pos = max(final_res.hidden_states.keys())
+                            choice_kwargs["hidden_states"] = final_res.hidden_states[last_pos]
+
+                choice_data = CompletionResponseChoice(**choice_kwargs)
                 choices.append(choice_data)
 
                 num_generated_tokens += len(output.token_ids)

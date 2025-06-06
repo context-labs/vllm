@@ -30,6 +30,8 @@ class Request:
         lora_request: Optional["LoRARequest"] = None,
         structured_output_request: Optional["StructuredOutputRequest"] = None,
         cache_salt: Optional[str] = None,
+        return_hidden_states: bool = False,
+        hidden_states_for_tokens: Optional[list[int]] = None,
     ) -> None:
         self.request_id = request_id
         self.client_index = client_index
@@ -54,6 +56,10 @@ class Request:
         self.spec_token_ids: list[int] = []
         self.num_computed_tokens = 0
         self.cache_salt: Optional[str] = cache_salt
+
+        # Hidden states configuration
+        self.return_hidden_states = return_hidden_states
+        self.hidden_states_for_tokens = hidden_states_for_tokens
 
         # Multi-modal related
         self.mm_positions = multi_modal_placeholders or []
@@ -102,6 +108,8 @@ class Request:
             structured_output_request=StructuredOutputRequest(
                 sampling_params=request.sampling_params),
             cache_salt=request.cache_salt,
+            return_hidden_states=request.return_hidden_states,
+            hidden_states_for_tokens=request.hidden_states_for_tokens,
         )
 
     def append_output_token_ids(

@@ -115,6 +115,228 @@ def test_chat_completion_hidden_states(server):
     except Exception as e:
         print(f"❌ Request failed: {e}")
 
+def test_completion_streaming_hidden_states(server):
+    """Test completion API with streaming and hidden states."""
+    print("\n🔍 Testing /v1/completions with streaming and hidden states...")
+    
+    url = server.url_for("v1", "completions")
+    headers = {"Content-Type": "application/json"}
+    payload = {
+        "model": MODEL_NAME,
+        "prompt": "The capital of France is",
+        "max_tokens": 5,
+        "temperature": 0.7,
+        "stream": True,
+        "return_hidden_states": True,
+        "hidden_states_for_tokens": [-1]  # Last token
+    }
+    
+    print(f"📤 Request: {json.dumps(payload, indent=2)}")
+    
+    try:
+        response = requests.post(url, json=payload, headers=headers, stream=True, timeout=30)
+        print(f"📊 Response status: {response.status_code}")
+        
+        if response.status_code == 200:
+            chunks = []
+            generated_text = ""
+            found_hidden_states = False
+            hidden_states_chunk = None
+            
+            for line in response.iter_lines(decode_unicode=True):
+                if line.startswith("data: "):
+                    chunk_data = line[6:]  # Remove "data: " prefix
+                    if chunk_data == "[DONE]":
+                        print("📄 Stream finished with [DONE]")
+                        break
+                    
+                    try:
+                        chunk = json.loads(chunk_data)
+                        chunks.append(chunk)
+                        
+                        if "choices" in chunk and chunk["choices"]:
+                            choice = chunk["choices"][0]
+                            if "text" in choice:
+                                generated_text += choice["text"]
+                            
+                            # Check for hidden states in final chunk
+                            if choice.get("finish_reason") is not None:
+                                print(f"📋 Final chunk finish_reason: {choice['finish_reason']}")
+                                if "hidden_states" in choice and choice["hidden_states"] is not None:
+                                    found_hidden_states = True
+                                    hidden_states_chunk = chunk
+                                    print(f"✅ Hidden states found in final chunk: length={len(choice['hidden_states'])}")
+                                    print(f"   First few values: {choice['hidden_states'][:5]}")
+                                else:
+                                    print("❌ No hidden states in final chunk")
+                    except json.JSONDecodeError as e:
+                        print(f"⚠️  Failed to parse chunk: {e}")
+            
+            print(f"📝 Complete generated text: '{generated_text}'")
+            print(f"📊 Total chunks received: {len(chunks)}")
+            if found_hidden_states:
+                print("✅ Streaming with hidden states: SUCCESS")
+            else:
+                print("❌ Streaming with hidden states: FAILED - No hidden states found")
+                
+        else:
+            print(f"❌ Error response: {response.text}")
+            
+    except Exception as e:
+        print(f"❌ Request failed: {e}")
+
+def test_chat_completion_streaming_hidden_states(server):
+    """Test chat completion API with streaming and hidden states."""
+    print("\n🔍 Testing /v1/chat/completions with streaming and hidden states...")
+    
+    url = server.url_for("v1", "chat/completions")
+    headers = {"Content-Type": "application/json"}
+    payload = {
+        "model": MODEL_NAME,
+        "messages": [{"role": "user", "content": "What is the capital of France?"}],
+        "max_tokens": 5,
+        "temperature": 0.7,
+        "stream": True,
+        "return_hidden_states": True,
+        "hidden_states_for_tokens": [-1]  # Last token
+    }
+    
+    print(f"📤 Request: {json.dumps(payload, indent=2)}")
+    
+    try:
+        response = requests.post(url, json=payload, headers=headers, stream=True, timeout=30)
+        print(f"📊 Response status: {response.status_code}")
+        
+        if response.status_code == 200:
+            chunks = []
+            generated_text = ""
+            found_hidden_states = False
+            hidden_states_chunk = None
+            
+            for line in response.iter_lines(decode_unicode=True):
+                if line.startswith("data: "):
+                    chunk_data = line[6:]  # Remove "data: " prefix
+                    if chunk_data == "[DONE]":
+                        print("📄 Stream finished with [DONE]")
+                        break
+                    
+                    try:
+                        chunk = json.loads(chunk_data)
+                        chunks.append(chunk)
+                        
+                        if "choices" in chunk and chunk["choices"]:
+                            choice = chunk["choices"][0]
+                            if "delta" in choice and "content" in choice["delta"]:
+                                if choice["delta"]["content"]:
+                                    generated_text += choice["delta"]["content"]
+                            
+                            # Check for hidden states in final chunk
+                            if choice.get("finish_reason") is not None:
+                                print(f"📋 Final chunk finish_reason: {choice['finish_reason']}")
+                                delta = choice.get("delta", {})
+                                if "hidden_states" in delta and delta["hidden_states"] is not None:
+                                    found_hidden_states = True
+                                    hidden_states_chunk = chunk
+                                    print(f"✅ Hidden states found in final chunk delta: length={len(delta['hidden_states'])}")
+                                    print(f"   First few values: {delta['hidden_states'][:5]}")
+                                else:
+                                    print("❌ No hidden states in final chunk delta")
+                    except json.JSONDecodeError as e:
+                        print(f"⚠️  Failed to parse chunk: {e}")
+            
+            print(f"📝 Complete generated text: '{generated_text}'")
+            print(f"📊 Total chunks received: {len(chunks)}")
+            if found_hidden_states:
+                print("✅ Chat streaming with hidden states: SUCCESS")
+            else:
+                print("❌ Chat streaming with hidden states: FAILED - No hidden states found")
+                
+        else:
+            print(f"❌ Error response: {response.text}")
+            
+    except Exception as e:
+        print(f"❌ Request failed: {e}")
+
+def test_streaming_parallel_sampling(server):
+    """Test streaming with parallel sampling (n>1) and hidden states."""
+    print("\n🔍 Testing streaming with parallel sampling (n=2) and hidden states...")
+    
+    url = server.url_for("v1", "completions")
+    headers = {"Content-Type": "application/json"}
+    payload = {
+        "model": MODEL_NAME,
+        "prompt": "The capital of France is",
+        "max_tokens": 3,
+        "temperature": 0.8,
+        "n": 2,  # Parallel sampling
+        "stream": True,
+        "return_hidden_states": True,
+        "hidden_states_for_tokens": [-1]  # Last token
+    }
+    
+    print(f"📤 Request: {json.dumps(payload, indent=2)}")
+    
+    try:
+        response = requests.post(url, json=payload, headers=headers, stream=True, timeout=30)
+        print(f"📊 Response status: {response.status_code}")
+        
+        if response.status_code == 200:
+            chunks = []
+            choice_texts = {}  # Track text per choice index
+            choice_hidden_states = {}  # Track hidden states per choice
+            
+            for line in response.iter_lines(decode_unicode=True):
+                if line.startswith("data: "):
+                    chunk_data = line[6:]  # Remove "data: " prefix
+                    if chunk_data == "[DONE]":
+                        print("📄 Stream finished with [DONE]")
+                        break
+                    
+                    try:
+                        chunk = json.loads(chunk_data)
+                        chunks.append(chunk)
+                        
+                        if "choices" in chunk and chunk["choices"]:
+                            choice = chunk["choices"][0]
+                            choice_idx = choice.get("index", 0)
+                            
+                            # Initialize tracking for this choice
+                            if choice_idx not in choice_texts:
+                                choice_texts[choice_idx] = ""
+                            
+                            if "text" in choice:
+                                choice_texts[choice_idx] += choice["text"]
+                            
+                            # Check for hidden states in final chunk
+                            if choice.get("finish_reason") is not None:
+                                print(f"📋 Choice {choice_idx} final chunk - finish_reason: {choice['finish_reason']}")
+                                if "hidden_states" in choice and choice["hidden_states"] is not None:
+                                    choice_hidden_states[choice_idx] = choice["hidden_states"]
+                                    print(f"✅ Choice {choice_idx} hidden states: length={len(choice['hidden_states'])}")
+                                    print(f"   First few values: {choice['hidden_states'][:3]}")
+                                else:
+                                    print(f"❌ Choice {choice_idx} missing hidden states")
+                    except json.JSONDecodeError as e:
+                        print(f"⚠️  Failed to parse chunk: {e}")
+            
+            print(f"📊 Total chunks received: {len(chunks)}")
+            print(f"📝 Generated texts:")
+            for idx, text in choice_texts.items():
+                print(f"   Choice {idx}: '{text}'")
+            
+            expected_choices = 2
+            if len(choice_hidden_states) == expected_choices:
+                print(f"✅ Parallel sampling (n={expected_choices}) with hidden states: SUCCESS")
+                print(f"   Hidden states received for {len(choice_hidden_states)} choices")
+            else:
+                print(f"❌ Parallel sampling failed: Expected {expected_choices} choices with hidden states, got {len(choice_hidden_states)}")
+                
+        else:
+            print(f"❌ Error response: {response.text}")
+            
+    except Exception as e:
+        print(f"❌ Request failed: {e}")
+
 def check_server_health(server):
     """Check if vLLM server is running and responsive."""
     print("🏥 Checking server health...")
@@ -187,9 +409,14 @@ def run_debug_tests():
                 print("❌ Model availability check failed")
                 return False
             
-            # Test APIs
+            # Test APIs - Non-streaming
             test_completion_hidden_states(server)
             test_chat_completion_hidden_states(server)
+            
+            # Test APIs - Streaming  
+            test_completion_streaming_hidden_states(server)
+            test_chat_completion_streaming_hidden_states(server)
+            test_streaming_parallel_sampling(server)
             
             print("\n🏁 Debug complete!")
             return True

@@ -820,6 +820,42 @@ class OpenAIServingChat(OpenAIServing):
                                               model_dump(exclude_none=True))
                             ])
 
+                        # Add hidden states to delta if they were requested and available
+                        if (hasattr(res, 'hidden_states') and 
+                            res.hidden_states is not None and 
+                            request.return_hidden_states):
+                            # Hidden states are keyed by token position, not output index
+                            if res.hidden_states:
+                                hidden_states = None
+                                # If user requested specific token positions, use those
+                                # Otherwise use the last available token position
+                                if request.hidden_states_for_tokens:
+                                    # Handle -1 as last token position by using the last available position
+                                    if -1 in request.hidden_states_for_tokens:
+                                        # For -1, use the last available position in hidden_states
+                                        last_pos = max(res.hidden_states.keys())
+                                        hidden_states = res.hidden_states[last_pos]
+                                    else:
+                                        # Look for specific positions
+                                        for pos in request.hidden_states_for_tokens:
+                                            if pos in res.hidden_states:
+                                                hidden_states = res.hidden_states[pos]
+                                                break
+                                else:
+                                    # No specific positions requested, use last available
+                                    last_pos = max(res.hidden_states.keys())
+                                    hidden_states = res.hidden_states[last_pos]
+                                
+                                # Create a new delta with hidden states
+                                if hidden_states is not None:
+                                    delta_message = DeltaMessage(
+                                        content=delta_message.content if delta_message else None,
+                                        role=delta_message.role if delta_message else None,
+                                        reasoning_content=delta_message.reasoning_content if delta_message else None,
+                                        tool_calls=delta_message.tool_calls if delta_message else [],
+                                        hidden_states=hidden_states
+                                    )
+
                         # Send the finish response for each request.n only once
                         choice_data = ChatCompletionResponseStreamChoice(
                             index=i,

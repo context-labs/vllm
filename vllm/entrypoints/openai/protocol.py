@@ -1303,6 +1303,8 @@ class CompletionResponse(OpenAIBaseModel):
 
 
 class CompletionResponseStreamChoice(OpenAIBaseModel):
+    exclude_if_none_fields = ["hidden_states"]
+    
     index: int
     text: str
     logprobs: Optional[CompletionLogProbs] = None
@@ -1313,6 +1315,15 @@ class CompletionResponseStreamChoice(OpenAIBaseModel):
             "The stop string or token id that caused the completion "
             "to stop, None if the completion finished for some other reason "
             "including encountering the EOS token"),
+    )
+    # Hidden states extraction (vLLM extension)
+    hidden_states: Optional[list[float]] = Field(
+        default=None,
+        description=(
+            "Hidden states (pre-LM head activations) for the final token "
+            "in the completion. Only included if return_hidden_states=True "
+            "in the request and this is the final chunk with finish_reason."
+        )
     )
 
 
@@ -1503,10 +1514,21 @@ class ChatCompletionResponse(OpenAIBaseModel):
 
 
 class DeltaMessage(OpenAIBaseModel):
+    exclude_if_none_fields = ["hidden_states"]
+    
     role: Optional[str] = None
     content: Optional[str] = None
     reasoning_content: Optional[str] = None
     tool_calls: list[DeltaToolCall] = Field(default_factory=list)
+    # Hidden states extraction (vLLM extension)
+    hidden_states: Optional[list[float]] = Field(
+        default=None,
+        description=(
+            "Hidden states (pre-LM head activations) for the final token "
+            "in the completion. Only included if return_hidden_states=True "
+            "in the request and this is the final chunk with finish_reason."
+        )
+    )
 
 
 class ChatCompletionResponseStreamChoice(OpenAIBaseModel):

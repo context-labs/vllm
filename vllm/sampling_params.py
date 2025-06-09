@@ -245,7 +245,7 @@ class SamplingParams(
 
     # Fields used for hidden states extraction
     return_hidden_states: bool = False
-    hidden_states_for_tokens: Optional[list[int]] = None
+    hidden_states_token_positions: Optional[list[int]] = None
 
     # Fields used for bad words
     bad_words: Optional[list[str]] = None
@@ -284,7 +284,7 @@ class SamplingParams(
         allowed_token_ids: Optional[list[int]] = None,
         extra_args: Optional[dict[str, Any]] = None,
         return_hidden_states: bool = False,
-        hidden_states_for_tokens: Optional[list[int]] = None,
+        hidden_states_token_positions: Optional[list[int]] = None,
     ) -> "SamplingParams":
         if logit_bias is not None:
             # Convert token_id to integer
@@ -328,7 +328,7 @@ class SamplingParams(
             allowed_token_ids=allowed_token_ids,
             extra_args=extra_args,
             return_hidden_states=return_hidden_states,
-            hidden_states_for_tokens=hidden_states_for_tokens,
+            hidden_states_token_positions=hidden_states_token_positions,
         )
 
     def __post_init__(self) -> None:

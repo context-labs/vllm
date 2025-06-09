@@ -66,7 +66,7 @@ class EngineCoreRequest(
 
     # Hidden states configuration
     return_hidden_states: bool = False
-    hidden_states_for_tokens: Optional[list[int]] = None
+    hidden_states_token_positions: Optional[list[int]] = None
 
 
 class HiddenStatesExtractionRequest(

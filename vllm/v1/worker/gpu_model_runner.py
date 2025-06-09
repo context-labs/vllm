@@ -374,7 +374,7 @@ class GPUModelRunner(LoRAModelRunnerMixin):
                 output_token_ids=[],
                 lora_request=new_req_data.lora_request,
                 return_hidden_states=new_req_data.return_hidden_states,
-                hidden_states_for_tokens=new_req_data.hidden_states_for_tokens,
+                hidden_states_token_positions=new_req_data.hidden_states_token_positions,
             )
 
             # Only relevant for models using M-RoPE (e.g, Qwen2-VL)
@@ -1687,9 +1687,6 @@ class GPUModelRunner(LoRAModelRunnerMixin):
         """
         Extract hidden states for requests that need them.
         
-        This method implements the core hidden states extraction logic for the
-        Post-Sampling Prefill Strategy as defined in DESIGN.md.
-        
         Args:
             hidden_states: Hidden states tensor from model forward pass [num_tokens, hidden_size]
             scheduler_output: Scheduler output containing request metadata
@@ -1715,15 +1712,15 @@ class GPUModelRunner(LoRAModelRunnerMixin):
                 # These come from the ZMQ pipeline as prefill-only requests
                 if request_state.return_hidden_states:
                     # Get the target positions for hidden states extraction
-                    hidden_states_for_tokens = request_state.hidden_states_for_tokens
-                    if hidden_states_for_tokens is None:
+                    hidden_states_token_positions = request_state.hidden_states_token_positions
+                    if hidden_states_token_positions is None:
                         # Default: extract for the last token position
-                        hidden_states_for_tokens = [-1]
+                        hidden_states_token_positions = [-1]
                     
                     requests_needing_hidden_states.append({
                         'req_id': req_id,
                         'batch_index': self.input_batch.req_id_to_index.get(req_id),
-                        'target_positions': hidden_states_for_tokens,
+                        'target_positions': hidden_states_token_positions,
                         'num_tokens': scheduler_output.num_scheduled_tokens.get(req_id, 0)
                     })
         

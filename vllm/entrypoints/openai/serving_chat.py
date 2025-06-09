@@ -857,15 +857,15 @@ class OpenAIServingChat(OpenAIServing):
                     hidden_states = None
                     # If user requested specific token positions, use those
                     # Otherwise use the last available token position
-                    if request.hidden_states_for_tokens:
+                    if request.hidden_states_token_positions:
                         # Handle -1 as last token position by using the last available position
-                        if -1 in request.hidden_states_for_tokens:
+                        if -1 in request.hidden_states_token_positions:
                             # For -1, use the last available position in hidden_states
                             last_pos = max(res.hidden_states.keys())
                             hidden_states = res.hidden_states[last_pos]
                         else:
                             # Look for specific positions
-                            for pos in request.hidden_states_for_tokens:
+                            for pos in request.hidden_states_token_positions:
                                 if pos in res.hidden_states:
                                     hidden_states = res.hidden_states[pos]
                                     break
@@ -1104,11 +1104,11 @@ class OpenAIServingChat(OpenAIServing):
                 if final_res.hidden_states:
                     # If user requested specific token positions, use those
                     # Otherwise use the last available token position
-                    if request.hidden_states_for_tokens:
+                    if request.hidden_states_token_positions:
                         # Handle -1 as last token position
                         requested_positions = []
                         total_tokens = len(final_res.prompt_token_ids or []) + len(output.token_ids)
-                        for pos in request.hidden_states_for_tokens:
+                        for pos in request.hidden_states_token_positions:
                             if pos == -1:
                                 # Last token position (convert to absolute position)
                                 requested_positions.append(total_tokens - 1)

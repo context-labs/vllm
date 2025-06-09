@@ -31,7 +31,7 @@ class Request:
         structured_output_request: Optional["StructuredOutputRequest"] = None,
         cache_salt: Optional[str] = None,
         return_hidden_states: bool = False,
-        hidden_states_for_tokens: Optional[list[int]] = None,
+        hidden_states_token_positions: Optional[list[int]] = None,
     ) -> None:
         self.request_id = request_id
         self.client_index = client_index
@@ -59,7 +59,7 @@ class Request:
 
         # Hidden states configuration
         self.return_hidden_states = return_hidden_states
-        self.hidden_states_for_tokens = hidden_states_for_tokens
+        self.hidden_states_token_positions = hidden_states_token_positions
 
         # Multi-modal related
         self.mm_positions = multi_modal_placeholders or []
@@ -109,7 +109,7 @@ class Request:
                 sampling_params=request.sampling_params),
             cache_salt=request.cache_salt,
             return_hidden_states=request.return_hidden_states,
-            hidden_states_for_tokens=request.hidden_states_for_tokens,
+            hidden_states_token_positions=request.hidden_states_token_positions,
         )
 
     def append_output_token_ids(

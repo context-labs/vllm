@@ -328,7 +328,7 @@ class Processor:
             lora_request=lora_request,
             cache_salt=decoder_inputs.get("cache_salt"),
             return_hidden_states=sampling_params.return_hidden_states,
-            hidden_states_for_tokens=sampling_params.hidden_states_for_tokens,
+            hidden_states_token_positions=sampling_params.hidden_states_token_positions,
         )
 
     def _validate_model_inputs(self,

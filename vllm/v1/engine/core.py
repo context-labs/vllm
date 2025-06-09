@@ -213,7 +213,7 @@ class EngineCore:
             lora_request=None,  # TODO: Preserve from original if needed
             cache_salt=None,
             return_hidden_states=True,  # This is the key difference
-            hidden_states_for_tokens=[hs_request.target_position]
+            hidden_states_token_positions=[hs_request.target_position]
         )
         
         # Add the request for immediate processing

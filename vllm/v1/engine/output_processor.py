@@ -398,7 +398,7 @@ class OutputProcessor:
             if hidden_states_list and req_state.original_request and req_state.original_request.return_hidden_states:
                 # Convert list to dict mapping token position to hidden states
                 # For now, we map the last token position to the hidden states
-                # TODO: Support multiple token positions from hidden_states_for_tokens
+                # TODO: Support multiple token positions from hidden_states_token_positions
                 final_token_pos = req_state.get_final_token_position()
                 hidden_states_dict = {final_token_pos: hidden_states_list}
 

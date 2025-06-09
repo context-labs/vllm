@@ -422,10 +422,9 @@ class ChatCompletionRequest(OpenAIBaseModel):
         default=False,
         description=(
             "If true, extract and return hidden states (pre-LM head activations) "
-            "for the final token of the generated sequence. The hidden states are "
-            "extracted using vLLM's Post-Sampling Prefill Strategy for maximum "
-            "accuracy. Only supported by vLLM engine V1."))
-    hidden_states_for_tokens: Optional[list[int]] = Field(
+            "for the final token of the generated sequence. "
+            "Only supported by vLLM engine V1."))
+    hidden_states_token_positions: Optional[list[int]] = Field(
         default=None,
         description=(
             "List of token positions to extract hidden states for. Use -1 for "
@@ -573,7 +572,7 @@ class ChatCompletionRequest(OpenAIBaseModel):
             extra_args=({"kv_transfer_params": self.kv_transfer_params}
                         if self.kv_transfer_params else None),
             return_hidden_states=self.return_hidden_states,
-            hidden_states_for_tokens=self.hidden_states_for_tokens)
+            hidden_states_token_positions=self.hidden_states_token_positions)
 
     def _get_guided_json_from_tool(
             self) -> Optional[Union[str, dict, BaseModel]]:
@@ -891,10 +890,9 @@ class CompletionRequest(OpenAIBaseModel):
         default=False,
         description=(
             "If true, extract and return hidden states (pre-LM head activations) "
-            "for the final token of the generated sequence. The hidden states are "
-            "extracted using vLLM's Post-Sampling Prefill Strategy for maximum "
-            "accuracy. Only supported by vLLM engine V1."))
-    hidden_states_for_tokens: Optional[list[int]] = Field(
+            "for the final token of the generated sequence. "
+            "Only supported by vLLM engine V1."))
+    hidden_states_token_positions: Optional[list[int]] = Field(
         default=None,
         description=(
             "List of token positions to extract hidden states for. Use -1 for "
@@ -1031,7 +1029,7 @@ class CompletionRequest(OpenAIBaseModel):
             extra_args=({"kv_transfer_params": self.kv_transfer_params}
                         if self.kv_transfer_params else None),
             return_hidden_states=self.return_hidden_states,
-            hidden_states_for_tokens=self.hidden_states_for_tokens)
+            hidden_states_token_positions=self.hidden_states_token_positions)
 
     @model_validator(mode="before")
     @classmethod

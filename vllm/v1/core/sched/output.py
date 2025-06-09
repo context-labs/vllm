@@ -30,7 +30,7 @@ class NewRequestData:
     num_computed_tokens: int
     lora_request: Optional[LoRARequest]
     return_hidden_states: bool = False
-    hidden_states_for_tokens: Optional[list[int]] = None
+    hidden_states_token_positions: Optional[list[int]] = None
 
     @classmethod
     def from_request(
@@ -49,7 +49,7 @@ class NewRequestData:
             num_computed_tokens=request.num_computed_tokens,
             lora_request=request.lora_request,
             return_hidden_states=request.return_hidden_states,
-            hidden_states_for_tokens=request.hidden_states_for_tokens,
+            hidden_states_token_positions=request.hidden_states_token_positions,
         )
 
     def __repr__(self):

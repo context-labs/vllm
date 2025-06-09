@@ -40,7 +40,7 @@ class CachedRequestState:
     
     # Hidden states configuration
     return_hidden_states: bool = False
-    hidden_states_for_tokens: Optional[list[int]] = None
+    hidden_states_token_positions: Optional[list[int]] = None
 
     def __post_init__(self):
         self.num_prompt_tokens = len(self.prompt_token_ids)

@@ -24,7 +24,7 @@ def _test_hidden_states(llm, prompts, n = 1):
     sampling_params = vllm.SamplingParams(temperature=1,
                                           n=n,
                                           return_hidden_states=True,
-                                          hidden_states_for_tokens=[-1],
+                                          hidden_states_token_positions=[-1],
                                           max_tokens=10)
 
     outputs = llm.generate(
@@ -79,7 +79,7 @@ def test_last_token_with_truncated_response():
                                           n=1,
                                           max_tokens=1,
                                           return_hidden_states=True,
-                                          hidden_states_for_tokens=[-1]) 
+                                          hidden_states_token_positions=[-1]) 
 
     outputs = llm.generate(prompts, sampling_params)
 

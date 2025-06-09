@@ -88,7 +88,7 @@ class TestHiddenStatesAPI:
             "max_tokens": 10,
             "temperature": 0.7,
             "return_hidden_states": True,
-            "hidden_states_for_tokens": [-1]  # Last token
+            "hidden_states_token_positions": [-1]  # Last token
         }
         
         response = requests.post(url, json=payload, headers=headers)
@@ -155,7 +155,7 @@ class TestHiddenStatesAPI:
             "max_tokens": 5,
             "temperature": 0.7,
             "return_hidden_states": True,
-            "hidden_states_for_tokens": [-1]  # Last token
+            "hidden_states_token_positions": [-1]  # Last token
         }
         
         response = requests.post(url, json=payload, headers=headers)

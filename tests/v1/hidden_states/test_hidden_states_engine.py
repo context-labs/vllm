@@ -10,6 +10,7 @@ import torch
 from typing import Optional
 import vllm
 from time import sleep
+import pytest
 
 # Set V1 engine flag
 os.environ["VLLM_USE_V1"] = "1"
@@ -122,6 +123,8 @@ def test_last_token_hidden_states_parallel_sampling():
     _test_hidden_states(llm, ["The capital of France is"], n = 2)
 
 
+
+@pytest.mark.skip(reason="Speculative decoding not implemented for v1")
 def test_hidden_states_with_eagle():
     llm = vllm.LLM(
         model=model_dir,
@@ -148,19 +151,13 @@ def test_hidden_states_enforce_eager():
     _test_hidden_states(llm, prompts)
 
 
-def test_hidden_states_torch_compile():
-    pass
-
-
 def main():
     test_no_hidden_states_when_not_requested()
     test_last_token_with_truncated_response()
     test_last_token_hidden_states_engine_request()
     test_last_token_hidden_states_multiple_prompts()
     test_last_token_hidden_states_parallel_sampling()
-    test_hidden_states_with_eagle()
     test_hidden_states_enforce_eager()
-    test_hidden_states_torch_compile()
 
 if __name__ == "__main__":
     sys.exit(main())

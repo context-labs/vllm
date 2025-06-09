@@ -74,7 +74,7 @@ class TestHiddenStatesAPI:
             assert choice_dict["hidden_states"] is None
             print("   NOTE: hidden_states field present but None (expected with current implementation)")
         else:
-            print("   ✅ hidden_states field properly excluded")
+            print("   hidden_states field properly excluded")
     
     def test_chat_completion_with_hidden_states(self, server):
         """Test chat completion with hidden states extraction."""
@@ -111,11 +111,11 @@ class TestHiddenStatesAPI:
             if choice["hidden_states"] is not None:
                 assert isinstance(choice["hidden_states"], list)
                 assert len(choice["hidden_states"]) > 0
-                print(f"   ✅ Hidden states extracted: {len(choice['hidden_states'])} dimensions")
+                print(f"   Hidden states extracted: {len(choice['hidden_states'])} dimensions")
             else:
-                print("   📝 Hidden states requested but None returned (pipeline may not be fully connected)")
+                print("   Hidden states requested but None returned (pipeline may not be fully connected)")
         else:
-            print("   📝 Hidden states field not present (may indicate exclude_if_none is working)")
+            print("   Hidden states field not present (may indicate exclude_if_none is working)")
     
     def test_completion_without_hidden_states(self, server):
         """Test completion without hidden states (baseline functionality)."""
@@ -191,9 +191,9 @@ class TestHiddenStatesAPI:
         response = requests.post(url, json=payload, headers=headers)
         # This should either work (if server converts string to bool) or return 422
         if response.status_code == 422:
-            print("   ✅ Invalid parameter type correctly rejected")
+            print("   Invalid parameter type correctly rejected")
         else:
-            print("   📝 Server accepted string 'true' for boolean field")
+            print("   Server accepted string 'true' for boolean field")
     
     def test_backward_compatibility(self, server):
         """Test that existing API requests work without hidden states parameters."""
@@ -215,7 +215,80 @@ class TestHiddenStatesAPI:
         )
         assert completion_response.choices[0].text
         
-        print("   ✅ Backward compatibility maintained")
+        print("   Backward compatibility maintained")
+
+    def test_chat_completion_with_hidden_states_streaming(self, server):
+        import requests
+        import json
+        
+        url = server.url_for("v1/chat/completions")
+        payload = {
+            "model": MODEL_NAME,
+            "messages": [{"role": "user", "content": "Hello, can you help?"}],
+            "hidden_states": True,
+            "stream": True
+        }
+        response = requests.post(url, json=payload, stream=True)
+        response.raise_for_status()
+        
+        full_content = ""
+        hidden_states_found = False
+        
+        for line in response.iter_lines():
+            if line:
+                line_text = line.decode('utf-8')
+                if line_text.startswith('data: '):
+                    data_text = line_text[6:]
+                    if data_text.strip() == '[DONE]':
+                        break
+                    try:
+                        chunk = json.loads(data_text)
+                        choice = chunk.get('choices', [{}])[0]
+                        full_content += choice.get('delta', {}).get('content', '')
+                        if 'hidden_states' in choice:
+                            hidden_states_found = True
+                    except json.JSONDecodeError:
+                        continue
+
+        assert hidden_states_found, "Chat completion streaming should include hidden states."
+        assert full_content, "Chat completion streaming should produce content."
+
+
+    def test_completion_with_hidden_states_streaming(self, server):
+        import requests
+        import json
+        
+        url = server.url_for("v1/completions")
+        payload = {
+            "model": MODEL_NAME,
+            "prompt": "What is the answer?",
+            "hidden_states": True,
+            "stream": True
+        }
+        response = requests.post(url, json=payload, stream=True)
+        response.raise_for_status()
+
+        full_content = ""
+        hidden_states_found = False
+
+        for line in response.iter_lines():
+            if line:
+                line_text = line.decode('utf-8')
+                if line_text.startswith('data: '):
+                    data_text = line_text[6:]
+                    if data_text.strip() == '[DONE]':
+                        break
+                    try:
+                        chunk = json.loads(data_text)
+                        choice = chunk.get('choices', [{}])[0]
+                        full_content += choice.get('delta', {}).get('content', '')
+                        if 'hidden_states' in choice:
+                            hidden_states_found = True
+                    except json.JSONDecodeError:
+                        continue
+
+        assert hidden_states_found, "Completion streaming should include hidden states."
+        assert full_content, "Completion streaming should produce content."
 
 
 if __name__ == "__main__":

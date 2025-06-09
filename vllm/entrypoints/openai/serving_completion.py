@@ -522,10 +522,6 @@ class OpenAIServingCompletion(OpenAIServing):
                 }
                 
                 # Only include hidden_states if they were extracted and available
-                print("request.return_hidden_states", request.return_hidden_states)
-                print("final_res.hidden_states", final_res.hidden_states)
-                print("final_res.request_id", final_res.request_id)
-                print("final_res.request_id in final_res.hidden_states", final_res.request_id in final_res.hidden_states if final_res.hidden_states is not None else None)
                 if (request.return_hidden_states and final_res.hidden_states is not None and final_res.request_id in final_res.hidden_states):
                     choice_kwargs["hidden_states"] = final_res.hidden_states[final_res.request_id]
                         

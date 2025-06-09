@@ -1074,8 +1074,8 @@ class OpenAIServingChat(OpenAIServing):
             }
             
             # Only include hidden_states if they were extracted and available
-            if (request.return_hidden_states and final_res.hidden_states is not None and request_id in final_res.hidden_states):
-                choice_kwargs["hidden_states"] = final_res.hidden_states[request_id]
+            if (request.return_hidden_states and final_res.hidden_states is not None and final_res.request_id in final_res.hidden_states):
+                choice_kwargs["hidden_states"] = final_res.hidden_states[final_res.request_id]
 
             choice_data = ChatCompletionResponseChoice(**choice_kwargs)
             choices.append(choice_data)

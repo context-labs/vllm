@@ -381,31 +381,7 @@ class OpenAIServingCompletion(OpenAIServing):
                         "stop_reason": stop_reason,
                     }
 
-                    # Add hidden states only if this is the final chunk and they were requested
-                    if (finish_reason is not None and 
-                        hasattr(res, 'hidden_states') and 
-                        res.hidden_states is not None and 
-                        request.return_hidden_states):
-                        # Hidden states are keyed by token position, not output index
-                        if res.hidden_states:
-                            # If user requested specific token positions, use those
-                            # Otherwise use the last available token position
-                            if request.hidden_states_for_tokens:
-                                # Handle -1 as last token position by using the last available position
-                                if -1 in request.hidden_states_for_tokens:
-                                    # For -1, use the last available position in hidden_states
-                                    last_pos = max(res.hidden_states.keys())
-                                    choice_kwargs["hidden_states"] = res.hidden_states[last_pos]
-                                else:
-                                    # Look for specific positions
-                                    for pos in request.hidden_states_for_tokens:
-                                        if pos in res.hidden_states:
-                                            choice_kwargs["hidden_states"] = res.hidden_states[pos]
-                                            break
-                            else:
-                                # No specific positions requested, use last available
-                                last_pos = max(res.hidden_states.keys())
-                                choice_kwargs["hidden_states"] = res.hidden_states[last_pos]
+
 
                     chunk = CompletionStreamResponse(
                         id=request_id,
@@ -424,6 +400,40 @@ class OpenAIServingCompletion(OpenAIServing):
                     response_json = chunk.model_dump_json(exclude_unset=False)
                     yield f"data: {response_json}\n\n"
 
+            # Add hidden states only if this is the final chunk and they were requested
+            if (request.return_hidden_states and res.hidden_states is not None):
+                choice_kwargs = {
+                    "index": i,
+                    "text": ""
+                }
+
+                # If user requested specific token positions, use those
+                # Otherwise use the last available token position
+                if request.hidden_states_for_tokens:
+                    # Handle -1 as last token position by using the last available position
+                    if -1 in request.hidden_states_for_tokens:
+                        # For -1, use the last available position in hidden_states
+                        last_pos = max(res.hidden_states.keys())
+                        choice_kwargs["hidden_states"] = res.hidden_states[last_pos]
+                    else:
+                        # Look for specific positions
+                        for pos in request.hidden_states_for_tokens:
+                            if pos in res.hidden_states:
+                                choice_kwargs["hidden_states"] = res.hidden_states[pos]
+                                break
+                else:
+                    # No specific positions requested, use last available
+                    last_pos = max(res.hidden_states.keys())
+                    choice_kwargs["hidden_states"] = res.hidden_states[last_pos]
+                
+                chunk = CompletionStreamResponse(
+                    id=request_id,
+                    created=created_time,
+                    model=model_name,
+                    choices=[CompletionResponseStreamChoice(**choice_kwargs)])
+                response_json = chunk.model_dump_json(exclude_unset=False)
+                yield f"data: {response_json}\n\n"
+            
             total_prompt_tokens = sum(num_prompt_tokens)
             total_completion_tokens = sum(previous_num_tokens)
             final_usage_info = UsageInfo(
@@ -526,9 +536,7 @@ class OpenAIServingCompletion(OpenAIServing):
                 }
                 
                 # Only include hidden_states if they were extracted and available
-                if (hasattr(final_res, 'hidden_states') and 
-                    final_res.hidden_states is not None and 
-                    request.return_hidden_states):
+                if (final_res.hidden_states is not None and request.return_hidden_states):
                     # Hidden states are keyed by token position, not output index
                     # For completions, we typically want the last token's hidden states
                     if final_res.hidden_states:

@@ -1098,9 +1098,7 @@ class OpenAIServingChat(OpenAIServing):
             }
             
             # Only include hidden_states if they were extracted and available
-            if (hasattr(final_res, 'hidden_states') and 
-                final_res.hidden_states is not None and 
-                request.return_hidden_states):
+            if (final_res.hidden_states is not None and request.return_hidden_states):
                 # Hidden states are keyed by token position, not output index
                 # For chat completions, we typically want the last token's hidden states
                 if final_res.hidden_states:

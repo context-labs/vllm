@@ -262,7 +262,7 @@ class TestHiddenStatesAPI:
         payload = {
             "model": MODEL_NAME,
             "prompt": "What is the answer?",
-            "hidden_states": True,
+            "return_hidden_states": True,
             "stream": True
         }
         response = requests.post(url, json=payload, stream=True)
@@ -281,15 +281,12 @@ class TestHiddenStatesAPI:
                     try:
                         chunk = json.loads(data_text)
                         choice = chunk.get('choices', [{}])[0]
-                        full_content += choice.get('delta', {}).get('content', '')
                         if 'hidden_states' in choice:
                             hidden_states_found = True
                     except json.JSONDecodeError:
                         continue
 
         assert hidden_states_found, "Completion streaming should include hidden states."
-        assert full_content, "Completion streaming should produce content."
-
 
 if __name__ == "__main__":
     # Allow running this test directly

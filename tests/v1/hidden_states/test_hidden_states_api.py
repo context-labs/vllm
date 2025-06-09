@@ -29,6 +29,7 @@ def default_server_args():
         "--max-model-len", "2048",
         "--max-num-seqs", "128", 
         "--enforce-eager",
+        "--enable-return-hidden-states"
     ]
 
 

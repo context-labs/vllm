@@ -63,6 +63,7 @@ class OpenAIServingChat(OpenAIServing):
         enable_auto_tools: bool = False,
         tool_parser: Optional[str] = None,
         enable_prompt_tokens_details: bool = False,
+        enable_return_hidden_states: bool = False,
     ) -> None:
         super().__init__(engine_client=engine_client,
                          model_config=model_config,
@@ -109,6 +110,7 @@ class OpenAIServingChat(OpenAIServing):
                                 "been registered") from e
 
         self.enable_prompt_tokens_details = enable_prompt_tokens_details
+        self.enable_return_hidden_states = enable_return_hidden_states
         self.default_sampling_params = (
             self.model_config.get_diff_sampling_param())
         if self.default_sampling_params:
@@ -169,6 +171,12 @@ class OpenAIServingChat(OpenAIServing):
                 return self.create_error_response(
                     "\"auto\" tool choice requires "
                     "--enable-auto-tool-choice and --tool-call-parser to be set"
+                )
+
+            if (request.return_hidden_states and not self.enable_return_hidden_states):
+                return self.create_error_response(
+                    "\"return_hidden_states\" is not enabled. Please set "
+                    "--enable-return-hidden-states to enable it."
                 )
 
             tool_dicts = None if request.tools is None else [

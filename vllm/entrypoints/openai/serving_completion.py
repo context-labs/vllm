@@ -51,6 +51,7 @@ class OpenAIServingCompletion(OpenAIServing):
         *,
         request_logger: Optional[RequestLogger],
         return_tokens_as_token_ids: bool = False,
+        enable_return_hidden_states: bool = False,
     ):
         super().__init__(engine_client=engine_client,
                          model_config=model_config,
@@ -64,6 +65,7 @@ class OpenAIServingCompletion(OpenAIServing):
             source = "model" if source == "auto" else source
             logger.info("Using default completion sampling params from %s: %s",
                         source, self.default_sampling_params)
+        self.enable_return_hidden_states = enable_return_hidden_states
 
     async def create_completion(
         self,
@@ -97,6 +99,11 @@ class OpenAIServingCompletion(OpenAIServing):
         if request.echo and request.prompt_embeds is not None:
             return self.create_error_response(
                 "Echo is unsupported with prompt embeds.")
+
+        if request.return_hidden_states and not self.enable_return_hidden_states:
+            return self.create_error_response(
+                "\"return_hidden_states\" is not enabled. Please set "
+                "--enable-return-hidden-states to enable it.")
 
         request_id = f"cmpl-{self._base_request_id(raw_request)}"
         created_time = int(time.time())

@@ -243,6 +243,12 @@ def make_arg_parser(parser: FlexibleArgumentParser) -> FlexibleArgumentParser:
         " into OpenAI API format, the name register in this plugin can be used "
         "in ``--tool-call-parser``.")
 
+    parser.add_argument(
+        "--enable-return-hidden-states",
+        action="store_true",
+        default=False,
+        help="Enable returning hidden states in the response.")
+
     parser = AsyncEngineArgs.add_cli_args(parser)
 
     parser.add_argument('--max-log-len',

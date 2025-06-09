@@ -400,21 +400,22 @@ class OpenAIServingCompletion(OpenAIServing):
                     response_json = chunk.model_dump_json(exclude_unset=False)
                     yield f"data: {response_json}\n\n"
 
-            # Add hidden states only if this is the final chunk and they were requested
-            if (request.return_hidden_states and res.hidden_states is not None and request_id in res.hidden_states):
-                choice_kwargs = {
-                    "index": i,
-                    "text": "",
-                    "hidden_states": res.hidden_states[request_id]
-                }
-                
-                chunk = CompletionStreamResponse(
-                    id=request_id,
-                    created=created_time,
-                    model=model_name,
-                    choices=[CompletionResponseStreamChoice(**choice_kwargs)])
-                response_json = chunk.model_dump_json(exclude_unset=False)
-                yield f"data: {response_json}\n\n"
+                    # Add hidden states only if this is the final chunk and they were requested
+                    print("res.request_id", res.request_id)
+                    if (request.return_hidden_states and res.hidden_states is not None and res.request_id in res.hidden_states):
+                        choice_kwargs = {
+                            "index": i,
+                            "text": "",
+                            "hidden_states": res.hidden_states[res.request_id]
+                        }
+                        
+                        chunk = CompletionStreamResponse(
+                            id=request_id,
+                            created=created_time,
+                            model=model_name,
+                            choices=[CompletionResponseStreamChoice(**choice_kwargs)])
+                        response_json = chunk.model_dump_json(exclude_unset=False)
+                        yield f"data: {response_json}\n\n"
             
             total_prompt_tokens = sum(num_prompt_tokens)
             total_completion_tokens = sum(previous_num_tokens)
@@ -457,6 +458,9 @@ class OpenAIServingCompletion(OpenAIServing):
         choices: list[CompletionResponseChoice] = []
         num_prompt_tokens = 0
         num_generated_tokens = 0
+
+
+        print("The request id", request_id)
 
         for final_res in final_res_batch:
             prompt_token_ids = final_res.prompt_token_ids
@@ -518,8 +522,12 @@ class OpenAIServingCompletion(OpenAIServing):
                 }
                 
                 # Only include hidden_states if they were extracted and available
-                if (request.return_hidden_states and final_res.hidden_states is not None and request_id in final_res.hidden_states):
-                    choice_kwargs["hidden_states"] = final_res.hidden_states[request_id]
+                print("request.return_hidden_states", request.return_hidden_states)
+                print("final_res.hidden_states", final_res.hidden_states)
+                print("final_res.request_id", final_res.request_id)
+                print("final_res.request_id in final_res.hidden_states", final_res.request_id in final_res.hidden_states if final_res.hidden_states is not None else None)
+                if (request.return_hidden_states and final_res.hidden_states is not None and final_res.request_id in final_res.hidden_states):
+                    choice_kwargs["hidden_states"] = final_res.hidden_states[final_res.request_id]
                         
 
                 choice_data = CompletionResponseChoice(**choice_kwargs)

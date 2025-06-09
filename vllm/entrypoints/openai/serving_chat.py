@@ -851,13 +851,13 @@ class OpenAIServingChat(OpenAIServing):
                     yield f"data: {data}\n\n"
                     
                     # Create a new delta with hidden states
-                    if request.return_hidden_states and res.hidden_states is not None and request_id in res.hidden_states:
+                    if request.return_hidden_states and res.hidden_states is not None and res.request_id in res.hidden_states:
                         delta_message = DeltaMessage(
                             content=None,
                             role=None,
                             reasoning_content=None,
                             tool_calls=[],
-                            hidden_states=res.hidden_states[request_id]
+                            hidden_states=res.hidden_states[res.request_id]
                         )
                         choice_data = ChatCompletionResponseStreamChoice(
                             index=i,

@@ -71,7 +71,8 @@ def test_last_token_with_truncated_response():
     llm = vllm.LLM(
         model=model_dir,
         max_model_len=400,
-        trust_remote_code=True)
+        trust_remote_code=True,
+        enable_return_hidden_states=True)
 
     prompts = ["What is the meaning of life? Respond with an essay."]
 
@@ -94,7 +95,8 @@ def test_last_token_hidden_states_engine_request():
     llm = vllm.LLM(
         model=model_dir,
         max_model_len=400,
-        trust_remote_code=True)
+        trust_remote_code=True,
+        enable_return_hidden_states=True)
 
     _test_hidden_states(llm, ["The capital of France is"])
 
@@ -105,7 +107,8 @@ def test_last_token_hidden_states_multiple_prompts():
     llm = vllm.LLM(
         model=model_dir,
         max_model_len=400,
-        trust_remote_code=True)
+        trust_remote_code=True,
+        enable_return_hidden_states=True)
 
     prompts = ["The capital of France is", "The capital of Spain is"]
 
@@ -118,7 +121,8 @@ def test_last_token_hidden_states_parallel_sampling():
     llm = vllm.LLM(
         model=model_dir,
         max_model_len=400,
-        trust_remote_code=True)
+        trust_remote_code=True,
+        enable_return_hidden_states=True)
 
     _test_hidden_states(llm, ["The capital of France is"], n = 2)
 
@@ -133,7 +137,8 @@ def test_hidden_states_with_eagle():
         speculative_config={
             "model": eagle_dir,
             "draft_tensor_parallel_size": 1,
-        })
+        },
+        enable_return_hidden_states=True)
 
     prompts = ["What is the meaning of life?"]
 
@@ -144,7 +149,8 @@ def test_hidden_states_enforce_eager():
         model=model_dir,
         max_model_len=400,
         trust_remote_code=True,
-        enforce_eager=True)
+        enforce_eager=True,
+        enable_return_hidden_states=True)
 
     prompts = ["The capital of France is"]
 

@@ -4114,6 +4114,8 @@ class VllmConfig:
     you are using. Contents must be hashable."""
     instance_id: str = ""
     """The ID of the vLLM instance."""
+    enable_return_hidden_states: bool = False
+    """Enable returning hidden states."""
 
     def compute_hash(self) -> str:
         """

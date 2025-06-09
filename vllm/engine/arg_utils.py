@@ -422,6 +422,7 @@ class EngineArgs:
 
     use_tqdm_on_load: bool = LoadConfig.use_tqdm_on_load
     pt_load_map_location: str = LoadConfig.pt_load_map_location
+    enable_return_hidden_states: bool = False
 
     def __post_init__(self):
         # support `EngineArgs(compilation_config={...})`
@@ -1188,6 +1189,7 @@ class EngineArgs:
             kv_transfer_config=self.kv_transfer_config,
             kv_events_config=self.kv_events_config,
             additional_config=self.additional_config,
+            enable_return_hidden_states=self.enable_return_hidden_states,
         )
 
         return config

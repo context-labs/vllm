@@ -1281,11 +1281,12 @@ class CompletionResponseChoice(OpenAIBaseModel):
     )
     prompt_logprobs: Optional[list[Optional[dict[int, Logprob]]]] = None
     # Hidden states extraction (vLLM extension)
-    hidden_states: Optional[list[float]] = Field(
+    hidden_states: Optional[list[list[float]]] = Field(
         default=None,
         description=(
             "Hidden states (pre-LM head activations) for the final token "
             "of the generated sequence. Only included when return_hidden_states=True. "
+            "Usually of shape [1,hidden_size]"
             "A vLLM extension to the OpenAI API."))
 
 
@@ -1315,12 +1316,13 @@ class CompletionResponseStreamChoice(OpenAIBaseModel):
             "including encountering the EOS token"),
     )
     # Hidden states extraction (vLLM extension)
-    hidden_states: Optional[list[float]] = Field(
+    hidden_states: Optional[list[list[float]]] = Field(
         default=None,
         description=(
             "Hidden states (pre-LM head activations) for the final token "
             "in the completion. Only included if return_hidden_states=True "
             "in the request and this is the final chunk with finish_reason."
+            "Usually of shape [1,hidden_size]"
         )
     )
 
@@ -1491,7 +1493,7 @@ class ChatCompletionResponseChoice(OpenAIBaseModel):
     # not part of the OpenAI spec but included in vLLM for legacy reasons
     stop_reason: Optional[Union[int, str]] = None
     # Hidden states extraction (vLLM extension)
-    hidden_states: Optional[list[float]] = Field(
+    hidden_states: Optional[list[list[float]]] = Field(
         default=None,
         description=(
             "Hidden states (pre-LM head activations) for the final token "
@@ -1519,12 +1521,13 @@ class DeltaMessage(OpenAIBaseModel):
     reasoning_content: Optional[str] = None
     tool_calls: list[DeltaToolCall] = Field(default_factory=list)
     # Hidden states extraction (vLLM extension)
-    hidden_states: Optional[list[float]] = Field(
+    hidden_states: Optional[list[list[float]]] = Field(
         default=None,
         description=(
             "Hidden states (pre-LM head activations) for the final token "
             "in the completion. Only included if return_hidden_states=True "
             "in the request and this is the final chunk with finish_reason."
+            "Usually of shape [1,hidden_size]"
         )
     )
 

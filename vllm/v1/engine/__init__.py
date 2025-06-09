@@ -137,7 +137,7 @@ class EngineCoreOutput(
     num_cached_tokens: int = 0
 
     # Hidden states for final tokens (serialized for ZMQ transfer)
-    hidden_states: Optional[list[float]] = None
+    hidden_states: Optional[list[list[float]]] = None
 
     @property
     def finished(self) -> bool:

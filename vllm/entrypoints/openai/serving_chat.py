@@ -849,39 +849,15 @@ class OpenAIServingChat(OpenAIServing):
 
                     data = chunk.model_dump_json(exclude_none=True)
                     yield f"data: {data}\n\n"
-
-
-                # TODO: hidden states should be keyed by choice index not by token position
-                # Add hidden states to delta if they were requested and available
-                if (res.hidden_states is not None and request.return_hidden_states):
-                    hidden_states = None
-                    # If user requested specific token positions, use those
-                    # Otherwise use the last available token position
-                    if request.hidden_states_token_positions:
-                        # Handle -1 as last token position by using the last available position
-                        if -1 in request.hidden_states_token_positions:
-                            # For -1, use the last available position in hidden_states
-                            last_pos = max(res.hidden_states.keys())
-                            hidden_states = res.hidden_states[last_pos]
-                        else:
-                            # Look for specific positions
-                            for pos in request.hidden_states_token_positions:
-                                if pos in res.hidden_states:
-                                    hidden_states = res.hidden_states[pos]
-                                    break
-                    else:
-                        # No specific positions requested, use last available
-                        last_pos = max(res.hidden_states.keys())
-                        hidden_states = res.hidden_states[last_pos]
                     
                     # Create a new delta with hidden states
-                    if hidden_states is not None:
+                    if request.return_hidden_states and res.hidden_states is not None and request_id in res.hidden_states:
                         delta_message = DeltaMessage(
                             content=None,
                             role=None,
                             reasoning_content=None,
                             tool_calls=[],
-                            hidden_states=hidden_states
+                            hidden_states=res.hidden_states[request_id]
                         )
                         choice_data = ChatCompletionResponseStreamChoice(
                             index=i,
@@ -1098,32 +1074,8 @@ class OpenAIServingChat(OpenAIServing):
             }
             
             # Only include hidden_states if they were extracted and available
-            if (final_res.hidden_states is not None and request.return_hidden_states):
-                # Hidden states are keyed by token position, not output index
-                # For chat completions, we typically want the last token's hidden states
-                if final_res.hidden_states:
-                    # If user requested specific token positions, use those
-                    # Otherwise use the last available token position
-                    if request.hidden_states_token_positions:
-                        # Handle -1 as last token position
-                        requested_positions = []
-                        total_tokens = len(final_res.prompt_token_ids or []) + len(output.token_ids)
-                        for pos in request.hidden_states_token_positions:
-                            if pos == -1:
-                                # Last token position (convert to absolute position)
-                                requested_positions.append(total_tokens - 1)
-                            else:
-                                requested_positions.append(pos)
-                        
-                        # Find the first available position from the requested ones
-                        for pos in requested_positions:
-                            if pos in final_res.hidden_states:
-                                choice_kwargs["hidden_states"] = final_res.hidden_states[pos]
-                                break
-                    else:
-                        # No specific positions requested, use last available
-                        last_pos = max(final_res.hidden_states.keys())
-                        choice_kwargs["hidden_states"] = final_res.hidden_states[last_pos]
+            if (request.return_hidden_states and final_res.hidden_states is not None and request_id in final_res.hidden_states):
+                choice_kwargs["hidden_states"] = final_res.hidden_states[request_id]
 
             choice_data = ChatCompletionResponseChoice(**choice_kwargs)
             choices.append(choice_data)

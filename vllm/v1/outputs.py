@@ -104,7 +104,7 @@ class ModelRunnerOutput:
     finished_sending: Optional[set[str]] = None
     finished_recving: Optional[set[str]] = None
 
-    # Hidden states for final tokens: req_id -> hidden_states tensor
+    # Hidden states for final tokens: req_id -> hidden_states tensor (where positions are the requested token position(s))
     last_hidden_states: Optional[dict[str, torch.Tensor]] = None
     # Token positions for hidden states: req_id -> positions
     hidden_states_positions: Optional[dict[str, list[int]]] = None

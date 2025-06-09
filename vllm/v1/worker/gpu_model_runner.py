@@ -1703,18 +1703,10 @@ class GPUModelRunner(LoRAModelRunnerMixin):
         
         for req_id in self.input_batch.req_ids:
             if req_id in self.requests:
-                # NOTE: For the Post-Sampling Prefill Strategy, we look for
-                # HiddenStatesExtractionRequest which are converted to EngineCoreRequest
-                # with return_hidden_states=True in core.py:_handle_hidden_states_request
                 request_state = self.requests[req_id]
-                
-                # Check if this is a hidden states extraction request
-                # These come from the ZMQ pipeline as prefill-only requests
                 if request_state.return_hidden_states:
-                    # Get the target positions for hidden states extraction
                     hidden_states_token_positions = request_state.hidden_states_token_positions
                     if hidden_states_token_positions is None:
-                        # Default: extract for the last token position
                         hidden_states_token_positions = [-1]
                     
                     requests_needing_hidden_states.append({

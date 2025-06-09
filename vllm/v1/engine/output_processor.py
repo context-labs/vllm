@@ -176,7 +176,7 @@ class RequestState:
         stop_reason: Union[int, str, None],
         kv_transfer_params: Optional[dict[str, Any]] = None,
         num_cached_tokens: int = 0,
-        hidden_states: Optional[dict[int, list[float]]] = None,
+        hidden_states: Optional[dict[str, list[list[float]]]] = None,
     ) -> Optional[RequestOutput]:
 
         finished = finish_reason is not None
@@ -208,7 +208,7 @@ class RequestState:
         finished: bool,
         kv_transfer_params: Optional[dict[str, Any]] = None,
         num_cached_tokens: int = 0,
-        hidden_states: Optional[dict[int, list[float]]] = None,
+        hidden_states: Optional[dict[str, list[list[float]]]] = None,
     ) -> RequestOutput:
 
         if self.output_kind == RequestOutputKind.DELTA:
@@ -377,7 +377,7 @@ class OutputProcessor:
             stop_reason = engine_core_output.stop_reason
             kv_transfer_params = engine_core_output.kv_transfer_params
             num_cached_tokens = engine_core_output.num_cached_tokens
-            hidden_states_list = engine_core_output.hidden_states
+            hidden_states = engine_core_output.hidden_states
             req_state.is_prefilling = False
             
             # Track generated tokens for hidden states extraction
@@ -395,12 +395,8 @@ class OutputProcessor:
 
             # 4) Process hidden states if present
             hidden_states_dict = None
-            if hidden_states_list and req_state.original_request and req_state.original_request.return_hidden_states:
-                # Convert list to dict mapping token position to hidden states
-                # For now, we map the last token position to the hidden states
-                # TODO: Support multiple token positions from hidden_states_token_positions
-                final_token_pos = req_state.get_final_token_position()
-                hidden_states_dict = {final_token_pos: hidden_states_list}
+            if hidden_states and req_state.original_request and req_state.original_request.return_hidden_states:
+                hidden_states_dict = {req_id: hidden_states}
 
             # 5) Create and handle RequestOutput objects.
             if request_output := req_state.make_request_output(
@@ -415,16 +411,14 @@ class OutputProcessor:
 
             # Free completed requests.
             if finish_reason is not None:
-                # NEW: Check if this completed request needs hidden states extraction
-                if (req_state.original_request and 
-                    req_state.original_request.return_hidden_states):
-                    completed_request_info = CompletedRequestInfo(
-                        request_id=req_id,
-                        original_request=req_state.original_request,
-                        sequence_tokens=req_state.get_full_sequence(),
-                        final_token_position=req_state.get_final_token_position()
-                    )
-                    completed_requests.append(completed_request_info)
+
+                completed_request_info = CompletedRequestInfo(
+                    request_id=req_id,
+                    original_request=req_state.original_request,
+                    sequence_tokens=req_state.get_full_sequence(),
+                    final_token_position=req_state.get_final_token_position()
+                )
+                completed_requests.append(completed_request_info)
                 
                 self.request_states.pop(req_id)
                 # Remove parent request if applicable.

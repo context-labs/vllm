@@ -802,10 +802,8 @@ class Scheduler(SchedulerInterface):
                 if (request.return_hidden_states and 
                     model_runner_output.last_hidden_states and 
                     req_id in model_runner_output.last_hidden_states):
-                    # Convert tensor to flat list for serialization
                     hidden_states_tensor = model_runner_output.last_hidden_states[req_id]
-                    # Flatten tensor and convert to list of floats
-                    hidden_states = hidden_states_tensor.cpu().float().flatten().tolist()
+                    hidden_states = hidden_states_tensor.float().tolist()
 
                 # Add EngineCoreOutput for this Request.
                 outputs[request.client_index].append(

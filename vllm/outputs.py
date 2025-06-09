@@ -100,7 +100,7 @@ class RequestOutput:
         num_cached_tokens: The number of tokens with prefix cache hit.
         kv_transfer_params: The params for remote K/V transfer.
         hidden_states: Hidden states (pre-LM head activations) for specified tokens.
-                      Dict mapping token position to hidden states vector.
+                      Dict mapping req_id to hidden states matrix (usually, shape [1, hidden_size])
     """
 
     def __init__(
@@ -119,7 +119,7 @@ class RequestOutput:
         *,
         multi_modal_placeholders: Optional[MultiModalPlaceholderDict] = None,
         kv_transfer_params: Optional[dict[str, Any]] = None,
-        hidden_states: Optional[dict[int, list[float]]] = None,
+        hidden_states: Optional[dict[str, list[list[float]]]] = None,
         # Forward compatibility, code that uses args added in new release can
         # still run with older versions of vLLM without breaking.
         **kwargs: Any,

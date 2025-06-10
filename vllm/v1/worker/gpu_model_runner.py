@@ -4,7 +4,7 @@ import copy
 import gc
 import time
 import weakref
-from typing import TYPE_CHECKING, Optional, Union
+from typing import TYPE_CHECKING, Optional, Union, Dict, List
 
 import numpy as np
 import torch
@@ -1696,7 +1696,6 @@ class GPUModelRunner(LoRAModelRunnerMixin):
             - last_hidden_states_dict: {req_id: hidden_states_tensor} or None
             - hidden_states_positions_dict: {req_id: [positions]} or None
         """
-        from typing import Dict, List, Optional
         
         # Check if any requests in the current batch need hidden states
         requests_needing_hidden_states = []

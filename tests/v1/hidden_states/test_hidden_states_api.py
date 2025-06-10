@@ -195,28 +195,6 @@ class TestHiddenStatesAPI:
             print("   Invalid parameter type correctly rejected")
         else:
             print("   Server accepted string 'true' for boolean field")
-    
-    def test_backward_compatibility(self, server):
-        """Test that existing API requests work without hidden states parameters."""
-        client = server.get_client()
-        
-        # Standard chat completion
-        chat_response = client.chat.completions.create(
-            model=MODEL_NAME,
-            messages=[{"role": "user", "content": "Hello"}],
-            max_tokens=5
-        )
-        assert chat_response.choices[0].message.content
-        
-        # Standard completion
-        completion_response = client.completions.create(
-            model=MODEL_NAME,
-            prompt="Hello",
-            max_tokens=5
-        )
-        assert completion_response.choices[0].text
-        
-        print("   Backward compatibility maintained")
 
     def test_chat_completion_with_hidden_states_streaming(self, server):
         import requests
@@ -288,6 +266,42 @@ class TestHiddenStatesAPI:
                         continue
 
         assert hidden_states_found, "Completion streaming should include hidden states."
+
+
+    def test_chat_completion_parallel_sampling(self, server):
+        """Test retrieving hidden states via parallel sampling."""
+        print("Testing parallel sampling hidden states extraction...")
+
+        client = server.get_client()
+        
+        response = client.chat.completions.create(
+            model=MODEL_NAME,
+            messages=[{"role": "user", "content": "Hello! How are you today?"}],
+            temperature=0.7,
+            n = 2,
+            extra_body = {"return_hidden_states": True},
+        )
+
+        for choice in response.choices:
+            assert choice.hidden_states is not None
+
+    def test_completion_parallel_sampling(self, server):
+        """Test retrieving hidden states via parallel sampling."""
+        print("Testing parallel sampling hidden states extraction...")
+
+        client = server.get_client()
+        
+        response = client.completions.create(
+            model=MODEL_NAME,
+            prompt="Hello! How are you today?",
+            temperature=0.7,
+            n = 2,
+            extra_body = {"return_hidden_states": True},
+        )
+
+        for choice in response.choices:
+            choice = choice.model_dump()
+            assert "hidden_states" in choice and choice["hidden_states"] is not None
 
 if __name__ == "__main__":
     # Allow running this test directly

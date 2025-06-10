@@ -184,6 +184,11 @@ class RequestState:
 
         if not finished and final_only:
             # Only the final output is required in FINAL_ONLY mode.
+            # But we still need to aggregate hidden states for parent requests
+            if self.parent_req is not None and hidden_states is not None:
+                if not hasattr(self.parent_req, 'aggregated_hidden_states'):
+                    self.parent_req.aggregated_hidden_states = {}
+                self.parent_req.aggregated_hidden_states.update(hidden_states)
             return None
 
         completion_output = self._new_completion_output(
@@ -198,6 +203,17 @@ class RequestState:
             if not outputs:
                 return None
 
+        # For parent requests, we need to aggregate hidden states from all children
+        if self.parent_req is not None and hidden_states is not None:
+            # Store child's hidden states in parent request
+            if not hasattr(self.parent_req, 'aggregated_hidden_states'):
+                self.parent_req.aggregated_hidden_states = {}
+            self.parent_req.aggregated_hidden_states.update(hidden_states)
+            
+            # If all children are finished, use the aggregated hidden states
+            if finished:
+                hidden_states = self.parent_req.aggregated_hidden_states
+        
         return self._new_request_output(request_id, outputs, finished,
                                         kv_transfer_params, num_cached_tokens, hidden_states)
 

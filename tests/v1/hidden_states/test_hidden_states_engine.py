@@ -127,6 +127,77 @@ def test_last_token_hidden_states_parallel_sampling():
     _test_hidden_states(llm, ["The capital of France is"], n = 2)
 
 
+def test_parallel_sampling_multiple_prompts():
+    """Test parallel sampling with multiple prompts."""
+    print("Testing parallel sampling with multiple prompts...")
+    
+    llm = vllm.LLM(
+        model=model_dir,
+        max_model_len=400,
+        trust_remote_code=True,
+        enable_return_hidden_states=True)
+    
+    prompts = ["The capital of France is", "The capital of Spain is", "The capital of Italy is"]
+    
+    sampling_params = vllm.SamplingParams(
+        temperature=1,
+        n=3,  # 3 samples per prompt
+        return_hidden_states=True,
+        hidden_states_token_positions=[-1],
+        max_tokens=10
+    )
+    
+    outputs = llm.generate(prompts, sampling_params)
+    
+    # Verify we get hidden states for all prompts and all samples
+    assert len(outputs) == len(prompts), f"Expected {len(prompts)} outputs, got {len(outputs)}"
+    
+    for i, output in enumerate(outputs):
+        print(f"\nPrompt {i}: {prompts[i]}")
+        assert len(output.outputs) == 3, f"Expected 3 samples for prompt {i}, got {len(output.outputs)}"
+        
+        hidden_states = getattr(output, "hidden_states", None)
+        assert hidden_states is not None, f"Missing hidden_states for prompt {i}"
+        
+        # Check that we have hidden states for each sample
+        for j, completion in enumerate(output.outputs):
+            print(f"  Sample {j}: {completion.text[:50]}...")
+
+
+def test_parallel_sampling_with_specific_positions():
+    """Test parallel sampling with specific token positions for hidden states."""
+    print("Testing parallel sampling with specific token positions...")
+    
+    llm = vllm.LLM(
+        model=model_dir,
+        max_model_len=400,
+        trust_remote_code=True,
+        enable_return_hidden_states=True)
+    
+    prompt = "The quick brown fox jumps over the lazy dog"
+    
+    # Test with multiple specific positions
+    sampling_params = vllm.SamplingParams(
+        temperature=0.7,
+        n=3,
+        return_hidden_states=True,
+        hidden_states_token_positions=[0, 2, 4, -1],  # First, third, fifth, and last token
+        max_tokens=10
+    )
+    
+    outputs = llm.generate([prompt], sampling_params)
+    
+    assert len(outputs) == 1
+    output = outputs[0]
+    
+    assert len(output.outputs) == 3, f"Expected 3 samples, got {len(output.outputs)}"
+    
+    hidden_states = getattr(output, "hidden_states", None)
+    assert hidden_states is not None, "Missing hidden_states"
+    
+    print(f"Successfully retrieved hidden states for positions: {sampling_params.hidden_states_token_positions}")
+
+
 
 @pytest.mark.skip(reason="Speculative decoding not implemented for v1")
 def test_hidden_states_with_eagle():
@@ -163,6 +234,8 @@ def main():
     test_last_token_hidden_states_engine_request()
     test_last_token_hidden_states_multiple_prompts()
     test_last_token_hidden_states_parallel_sampling()
+    test_parallel_sampling_multiple_prompts()
+    test_parallel_sampling_with_specific_positions()
     test_hidden_states_enforce_eager()
 
 if __name__ == "__main__":

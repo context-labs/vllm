@@ -147,6 +147,12 @@ class RequestOutput:
 
         self.finished |= next_output.finished
         self.kv_transfer_params = next_output.kv_transfer_params
+        
+        # Merge hidden states from multiple outputs
+        if next_output.hidden_states:
+            if self.hidden_states is None:
+                self.hidden_states = {}
+            self.hidden_states.update(next_output.hidden_states)
 
         for next_completion in next_output.outputs:
             for i, completion in enumerate(self.outputs):

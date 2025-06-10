@@ -1700,20 +1700,21 @@ class GPUModelRunner(LoRAModelRunnerMixin):
         # Check if any requests in the current batch need hidden states
         requests_needing_hidden_states = []
         
-        for req_id in self.input_batch.req_ids:
+        for req_id in self.input_batch.req_ids[:self.input_batch.num_reqs]:
             if req_id in self.requests:
                 request_state = self.requests[req_id]
                 if request_state.return_hidden_states:
-                    hidden_states_token_positions = request_state.hidden_states_token_positions
-                    if hidden_states_token_positions is None:
-                        hidden_states_token_positions = [-1]
+                    req_idx = self.input_batch.req_id_to_index[req_id]
+                    num_tokens = scheduler_output.num_scheduled_tokens[req_id]
                     
-                    requests_needing_hidden_states.append({
-                        'req_id': req_id,
-                        'batch_index': self.input_batch.req_id_to_index.get(req_id),
-                        'target_positions': hidden_states_token_positions,
-                        'num_tokens': scheduler_output.num_scheduled_tokens.get(req_id, 0)
-                    })
+                    if num_tokens > 0:
+                        requests_needing_hidden_states.append({
+                            'req_id': req_id,
+                            'req_idx': req_idx,
+                            'num_tokens': num_tokens,
+                            'target_positions': request_state.hidden_states_token_positions,
+                            'num_computed_tokens': request_state.num_computed_tokens
+                        })
         
         # If no requests need hidden states, return None
         if not requests_needing_hidden_states:
@@ -1723,51 +1724,49 @@ class GPUModelRunner(LoRAModelRunnerMixin):
         last_hidden_states_dict = {}
         hidden_states_positions_dict = {}
         
-        # Track position offset for batch processing
-        current_offset = 0
-        
         for req_info in requests_needing_hidden_states:
             req_id = req_info['req_id']
+            req_idx = req_info['req_idx']
+            num_tokens = req_info['num_tokens']
             target_positions = req_info['target_positions']
-            num_tokens_this_req = req_info['num_tokens']
+            num_computed_tokens = req_info['num_computed_tokens']
             
-            if num_tokens_this_req == 0:
-                continue
-                
-            # Calculate absolute positions in the hidden_states tensor
-            absolute_positions = []
+            # Get the start and end positions for this request in the hidden_states tensor
+            # Using query_start_loc to get the actual positions in the batch
+            start_pos = self.query_start_loc_cpu[req_idx].item()
+            end_pos = start_pos + num_tokens
+            
+            # Get hidden states for this request
+            req_hidden_states = hidden_states[start_pos:end_pos]  # Shape: [num_tokens, hidden_size]
+            
+            # Default to last token if no specific positions requested
+            if target_positions is None:
+                target_positions = [-1]
+            
+            # Extract hidden states for the requested positions
+            extracted_states = []
+            actual_positions = []
+            
             for pos in target_positions:
                 if pos == -1:
-                    # Last token position for this request
-                    absolute_pos = current_offset + num_tokens_this_req - 1
-                elif pos >= 0 and pos < num_tokens_this_req:
-                    # Specific position within this request
-                    absolute_pos = current_offset + pos
+                    # Last token position - most common case
+                    if num_tokens > 0:
+                        extracted_states.append(req_hidden_states[-1])
+                        # The actual token position in the full sequence
+                        actual_positions.append(num_computed_tokens + num_tokens - 1)
                 else:
-                    # Invalid position, skip
-                    continue
-                absolute_positions.append(absolute_pos)
+                    # Specific position in the full sequence
+                    # Convert absolute position to position within current chunk
+                    chunk_pos = pos - num_computed_tokens
+                    if 0 <= chunk_pos < num_tokens:
+                        extracted_states.append(req_hidden_states[chunk_pos])
+                        actual_positions.append(pos)
             
-            if absolute_positions:
-                # Extract hidden states for the target positions
-                # Handle case where we might want multiple positions
-                if len(absolute_positions) == 1:
-                    # Single position - most common case (last token)
-                    pos = absolute_positions[0]
-                    if pos < hidden_states.shape[0]:
-                        extracted_hidden_states = hidden_states[pos:pos+1].cpu()  # Shape: [1, hidden_size]
-                        last_hidden_states_dict[req_id] = extracted_hidden_states
-                        hidden_states_positions_dict[req_id] = [target_positions[0]]  # Store original position
-                else:
-                    # Multiple positions - extract all
-                    valid_positions = [pos for pos in absolute_positions if pos < hidden_states.shape[0]]
-                    if valid_positions:
-                        extracted_hidden_states = hidden_states[valid_positions].cpu()  # Shape: [num_positions, hidden_size]
-                        last_hidden_states_dict[req_id] = extracted_hidden_states
-                        hidden_states_positions_dict[req_id] = [target_positions[i] for i, pos in enumerate(absolute_positions) if pos in valid_positions]
-            
-            # Update offset for next request
-            current_offset += num_tokens_this_req
+            if extracted_states:
+                # Stack the extracted states and move to CPU
+                extracted_tensor = torch.stack(extracted_states).cpu()
+                last_hidden_states_dict[req_id] = extracted_tensor
+                hidden_states_positions_dict[req_id] = actual_positions
         
         # Return the extracted hidden states if any were found
         if last_hidden_states_dict:

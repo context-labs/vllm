@@ -859,25 +859,32 @@ class OpenAIServingChat(OpenAIServing):
                     yield f"data: {data}\n\n"
                     
                     # Create a new delta with hidden states
-                    if request.return_hidden_states and res.hidden_states is not None and res.request_id in res.hidden_states:
-                        delta_message = DeltaMessage(
-                            content=None,
-                            role=None,
-                            reasoning_content=None,
-                            tool_calls=[],
-                            hidden_states=res.hidden_states[res.request_id]
-                        )
-                        choice_data = ChatCompletionResponseStreamChoice(
-                            index=i,
-                            delta=delta_message)
-                        chunk = ChatCompletionStreamResponse(
-                            id=request_id,
-                            object=chunk_object_type,
-                            created=created_time,
-                            choices=[choice_data],
-                            model=model_name)
-                        data = chunk.model_dump_json(exclude_none=True)
-                        yield f"data: {data}\n\n"
+                    if request.return_hidden_states and res.hidden_states is not None:
+                        # For parallel sampling (n > 1), construct the child request ID
+                        if request.n > 1:
+                            child_request_id = f"{i}_{res.request_id}"
+                        else:
+                            child_request_id = res.request_id
+                        
+                        if child_request_id in res.hidden_states:
+                            delta_message = DeltaMessage(
+                                content=None,
+                                role=None,
+                                reasoning_content=None,
+                                tool_calls=[],
+                                hidden_states=res.hidden_states[child_request_id]
+                            )
+                            choice_data = ChatCompletionResponseStreamChoice(
+                                index=i,
+                                delta=delta_message)
+                            chunk = ChatCompletionStreamResponse(
+                                id=request_id,
+                                object=chunk_object_type,
+                                created=created_time,
+                                choices=[choice_data],
+                                model=model_name)
+                            data = chunk.model_dump_json(exclude_none=True)
+                            yield f"data: {data}\n\n"
             
             # once the final token is handled, if stream_options.include_usage
             # is sent, send the usage
@@ -1082,8 +1089,16 @@ class OpenAIServingChat(OpenAIServing):
             }
             
             # Only include hidden_states if they were extracted and available
-            if (request.return_hidden_states and final_res.hidden_states is not None and final_res.request_id in final_res.hidden_states):
-                choice_kwargs["hidden_states"] = final_res.hidden_states[final_res.request_id]
+            if (request.return_hidden_states and final_res.hidden_states is not None):
+                # For parallel sampling (n > 1), construct the child request ID
+                if request.n > 1:
+                    child_request_id = f"{output.index}_{final_res.request_id}"
+                else:
+                    child_request_id = final_res.request_id
+                
+                
+                if child_request_id in final_res.hidden_states:
+                    choice_kwargs["hidden_states"] = final_res.hidden_states[child_request_id]
 
             choice_data = ChatCompletionResponseChoice(**choice_kwargs)
             choices.append(choice_data)

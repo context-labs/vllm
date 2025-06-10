@@ -408,21 +408,27 @@ class OpenAIServingCompletion(OpenAIServing):
                     yield f"data: {response_json}\n\n"
 
                     # Add hidden states only if this is the final chunk and they were requested
-                    print("res.request_id", res.request_id)
-                    if (request.return_hidden_states and res.hidden_states is not None and res.request_id in res.hidden_states):
-                        choice_kwargs = {
-                            "index": i,
-                            "text": "",
-                            "hidden_states": res.hidden_states[res.request_id]
-                        }
+                    if (request.return_hidden_states and res.hidden_states is not None):
+                        # For parallel sampling (n > 1), construct the child request ID
+                        if request.n > 1:
+                            child_request_id = f"{i}_{res.request_id}"
+                        else:
+                            child_request_id = res.request_id
                         
-                        chunk = CompletionStreamResponse(
-                            id=request_id,
-                            created=created_time,
-                            model=model_name,
-                            choices=[CompletionResponseStreamChoice(**choice_kwargs)])
-                        response_json = chunk.model_dump_json(exclude_unset=False)
-                        yield f"data: {response_json}\n\n"
+                        if child_request_id in res.hidden_states:
+                            choice_kwargs = {
+                                "index": i,
+                                "text": "",
+                                "hidden_states": res.hidden_states[child_request_id]
+                            }
+                        
+                            chunk = CompletionStreamResponse(
+                                id=request_id,
+                                created=created_time,
+                                model=model_name,
+                                choices=[CompletionResponseStreamChoice(**choice_kwargs)])
+                            response_json = chunk.model_dump_json(exclude_unset=False)
+                            yield f"data: {response_json}\n\n"
             
             total_prompt_tokens = sum(num_prompt_tokens)
             total_completion_tokens = sum(previous_num_tokens)
@@ -529,8 +535,16 @@ class OpenAIServingCompletion(OpenAIServing):
                 }
                 
                 # Only include hidden_states if they were extracted and available
-                if (request.return_hidden_states and final_res.hidden_states is not None and final_res.request_id in final_res.hidden_states):
-                    choice_kwargs["hidden_states"] = final_res.hidden_states[final_res.request_id]
+                if (request.return_hidden_states and final_res.hidden_states is not None):
+                    # For parallel sampling (n > 1), construct the child request ID
+                    if request.n > 1:
+                        child_request_id = f"{output.index}_{final_res.request_id}"
+                    else:
+                        child_request_id = final_res.request_id
+                    
+                    
+                    if child_request_id in final_res.hidden_states:
+                        choice_kwargs["hidden_states"] = final_res.hidden_states[child_request_id]
                         
 
                 choice_data = CompletionResponseChoice(**choice_kwargs)

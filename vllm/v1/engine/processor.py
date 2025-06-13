@@ -84,6 +84,9 @@ class Processor:
         self._validate_structured_output(params)
         self._validate_logit_bias(params)
 
+        if params.return_hidden_states_hash and not self.vllm_config.enable_return_hidden_states_hash:
+            raise ValueError("enable_return_hidden_states_hash must be set to True to return hidden states hash")
+
         if params.allowed_token_ids is None:
             return
         if not params.allowed_token_ids:

@@ -281,10 +281,18 @@ def make_arg_parser(parser: FlexibleArgumentParser) -> FlexibleArgumentParser:
     )
 
     parser.add_argument(
-        "--enable-return-hidden-states", 
+        "--enable-return-hidden-states-hash", 
         action='store_true', 
         default=False, 
         help="If set to True, enable returning hidden states in the response.")
+
+
+    parser.add_argument(
+        "--hidden-states-hash-args", 
+        type=str, 
+        default=None, 
+        help="""Additional arguments to pass to hidden states hash function.
+        Example: "--hidden-states-hash-args '{\"method\": \"TopLOC\", \"top-k\": 128}'""")
 
     return parser
 

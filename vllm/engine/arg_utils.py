@@ -444,7 +444,9 @@ class EngineArgs:
     enable_multimodal_encoder_data_parallel: bool = \
         ParallelConfig.enable_multimodal_encoder_data_parallel
 
-    enable_return_hidden_states: bool = False
+    enable_return_hidden_states_hash: bool = False
+
+    hidden_states_hash_args: dict = field(default_factory=dict)
 
     def __post_init__(self):
         # support `EngineArgs(compilation_config={...})`
@@ -1244,7 +1246,8 @@ class EngineArgs:
             kv_transfer_config=self.kv_transfer_config,
             kv_events_config=self.kv_events_config,
             additional_config=self.additional_config,
-            enable_return_hidden_states=self.enable_return_hidden_states,
+            enable_return_hidden_states_hash=self.enable_return_hidden_states_hash,
+            hidden_states_hash_args=self.hidden_states_hash_args,
         )
 
         return config

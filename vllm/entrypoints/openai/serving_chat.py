@@ -64,6 +64,7 @@ class OpenAIServingChat(OpenAIServing):
         enable_auto_tools: bool = False,
         tool_parser: Optional[str] = None,
         enable_prompt_tokens_details: bool = False,
+        enable_return_hidden_states_hash: bool = False
     ) -> None:
         super().__init__(engine_client=engine_client,
                          model_config=model_config,
@@ -118,6 +119,8 @@ class OpenAIServingChat(OpenAIServing):
             logger.info("Using default chat sampling params from %s: %s",
                         source, self.default_sampling_params)
 
+        self.enable_return_hidden_states_hash = enable_return_hidden_states_hash
+
     async def create_chat_completion(
         self,
         request: ChatCompletionRequest,
@@ -171,6 +174,12 @@ class OpenAIServingChat(OpenAIServing):
                     "\"auto\" tool choice requires "
                     "--enable-auto-tool-choice and --tool-call-parser to be set"
                 )
+
+            if (request.return_hidden_states_hash and not self.enable_return_hidden_states_hash):
+                return self.create_error_response(
+                    "\"return_hidden_states_hash\" is not enabled. Please set "
+                    "--enable-return-hidden-states-hash to enable it."
+                )                
 
             tool_dicts = None if request.tools is None else [
                 tool.model_dump() for tool in request.tools

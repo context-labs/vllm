@@ -413,6 +413,13 @@ class ChatCompletionRequest(OpenAIBaseModel):
         default=None,
         description="KVTransfer parameters used for disaggregated serving.")
 
+    # Hidden states extraction parameters
+    return_hidden_states_hash: bool = Field(
+        default=False,
+        description=(
+            "If true, extract and return hidden states hashes"
+            "Only supported by vLLM engine V1."))
+
     # --8<-- [end:chat-completion-extra-params]
 
     # Default sampling parameters for chat completion requests

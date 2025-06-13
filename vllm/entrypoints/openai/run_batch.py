@@ -342,6 +342,7 @@ async def main(args):
         chat_template=None,
         chat_template_content_format="auto",
         enable_prompt_tokens_details=args.enable_prompt_tokens_details,
+        enable_return_hidden_states_hash=args.enable_return_hidden_states_hash,
     ) if model_config.runner_type == "generate" else None
     openai_serving_embedding = OpenAIServingEmbedding(
         engine,

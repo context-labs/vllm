@@ -280,6 +280,12 @@ def make_arg_parser(parser: FlexibleArgumentParser) -> FlexibleArgumentParser:
         "If set to True, enable tracking server_load_metrics in the app state."
     )
 
+    parser.add_argument(
+        "--enable-return-hidden-states", 
+        action='store_true', 
+        default=False, 
+        help="If set to True, enable returning hidden states in the response.")
+
     return parser
 
 
